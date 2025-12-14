@@ -6,11 +6,22 @@ import java.util.Date;
 
 import com.google.gson.internal.LinkedTreeMap;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "score")
 public class Score {
 
 	private static SimpleDateFormat sdf = new SimpleDateFormat("dd/M/yyyy H:mm:ss aaa");
 	private Date dateadded;
-	private String 
+
+	@Id
+    @Column(name = "id")
+	private String id;
+	private String
 		name,accountid,
 		capitalships,freighters,
 		planets,starbases,

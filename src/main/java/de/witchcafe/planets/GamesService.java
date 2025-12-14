@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GamesService {
 
     private final GamesRepository gamesRepository;
+    private final ScoresRepository scoresRepository;
 	PlanetsRestTemplate pTemplate = new PlanetsRestTemplate();
 
 	String[] mypois = new String[] {
@@ -22,13 +23,17 @@ public class GamesService {
 	String[] pois = new String[] {
 			"strixy",
 			"sualtim",
+			"jabbapapa",
+			"zalrik",
+			"haler garog",
 			"edama",
 			"pivekop",
 			"jollyroger"
 	};
 	
-    GamesService(GamesRepository gamesRepository) {
+    GamesService(GamesRepository gamesRepository,ScoresRepository scoresRepository) {
         this.gamesRepository = gamesRepository;
+        this.scoresRepository = scoresRepository;
         for (String poi : pois) {
             ArrayList<Game> games = pTemplate.getActiveGamesByUsername(poi);
             System.out.println(String.format("adding %s games for %s",games.size(),poi));
@@ -58,6 +63,11 @@ public class GamesService {
 
 	public ArrayList<Score> getScoresByGameid(String id) {
 		return pTemplate.getScoresByGameid(id);
+	}
+	
+    @Transactional(readOnly = true)
+    public List<Score> listScores(Pageable pageable) {
+        return scoresRepository.findAllBy(pageable).toList();
 	}
 
 }
