@@ -1,103 +1,101 @@
 package de.witchcafe.planets.ui;
 
-import de.witchcafe.base.ui.component.ViewToolbar;
-import de.witchcafe.examplefeature.Task;
-import de.witchcafe.examplefeature.TaskService;
-import de.witchcafe.planets.Game;
-import de.witchcafe.planets.GamesService;
-import de.witchcafe.planets.Score;
+import java.util.ArrayList;
 
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Main;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.provider.ListDataProvider;
+import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
-import java.util.Optional;
+import de.witchcafe.base.ui.component.ViewToolbar;
+import de.witchcafe.planets.Game;
+import de.witchcafe.planets.GamesService;
+import de.witchcafe.planets.Score;
 
-import static com.vaadin.flow.spring.data.VaadinSpringDataHelpers.toSpringPageRequest;
-
-@Route("Scores/:gameId?")
-@PageTitle("Score List")
-@Menu(order = 0, icon = "vaadin:clipboard-check", title = "Score List")
+@PageTitle("Raw Score List")
+@AnonymousAllowed
+// @Menu(order = 0, icon = "vaadin:clipboard-check", title = "Raw Score List")
+@Route("rawscores/:gameId?")
 class ScoreListView extends Main implements BeforeEnterObserver{
 
     private final GamesService gamesService;
 
-    final TextField description;
-    final DatePicker dueDate;
-    final Button createBtn;
     final Grid<Score> scoreGrid;
+
+	private ListDataProvider<Score> dataProvider;
 
     ScoreListView(GamesService gamesService) {
         this.gamesService = gamesService;
 
-        description = new TextField();
-        description.setPlaceholder("What do you want to do?");
-        description.setAriaLabel("Task description");
-        description.setMaxLength(Task.DESCRIPTION_MAX_LENGTH);
-        description.setMinWidth("20em");
-        
-        
 
-        dueDate = new DatePicker();
-        dueDate.setPlaceholder("Due date");
-        dueDate.setAriaLabel("Due date");
+        scoreGrid = new Grid<>(Score.class);
+        dataProvider = new ListDataProvider<Score>(new ArrayList<Score>());
 
-        createBtn = new Button("Create", event -> createTask());
-        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        scoreGrid.setDataProvider(dataProvider);
 
-        var dateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(getLocale())
-                .withZone(ZoneId.systemDefault());
-        var dateFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(getLocale());
+        scoreGrid.setColumns("turn", "name", "planets", "starbases", "capitalships", "freighters");
+        scoreGrid.getColumnByKey("name").setHeader("blafasel");
 
-        scoreGrid = new Grid<>();
-
-		scoreGrid.setItems(query -> gamesService.getScoresByGameid(gameId).stream());
-        scoreGrid.addColumn(Score::getName).setHeader("Name");
-        scoreGrid.addColumn(Score::getTurn).setHeader("Turn");
-        scoreGrid.addColumn(Score::getCapitalships).setHeader("Capitalships");
-        scoreGrid.addColumn(Score::getFreighters).setHeader("Freighters");
-
-        // gameGrid.addColumn(Game::getDescription).setHeader("Description");
-        // gameGrid.addColumn(game -> Optional.ofNullable(game.getDatecreated()).map(dateFormatter::format).orElse("Never")).setHeader("Due Date");
-        // gameGrid.addColumn(game -> dateTimeFormatter.format(game.getDatecreated())).setHeader("Creation Date");
         scoreGrid.setSizeFull();
 
         setSizeFull();
         addClassNames(LumoUtility.BoxSizing.BORDER, LumoUtility.Display.FLEX, LumoUtility.FlexDirection.COLUMN,
                 LumoUtility.Padding.MEDIUM, LumoUtility.Gap.SMALL);
 
-        add(new ViewToolbar("Score List", ViewToolbar.group(description, dueDate, createBtn)));
+        add(new ViewToolbar("Score List", ViewToolbar.group(getSearchField())));
         add(scoreGrid);
     }
     
-    private void createTask() {
-        gamesService.createTask(description.getValue(), dueDate.getValue());
-        scoreGrid.getDataProvider().refreshAll();
-        description.clear();
-        dueDate.clear();
-        Notification.show("Task added", 3000, Notification.Position.BOTTOM_END)
-                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-    }
+	private TextField getSearchField() {
+		// Das Suchfeld erstellen
+		TextField searchField = new TextField();
+		searchField.setPlaceholder("Suche nach Name oder Typ...");
+		searchField.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
+		searchField.setClearButtonVisible(true); // Erlaubt schnelles Löschen der Suche
+		searchField.setValueChangeMode(ValueChangeMode.EAGER); // Filtert sofort beim Tippen
 
-    private String gameId;
+		// Die Filter-Logik
+		searchField.addValueChangeListener(event -> {
+		    String searchTerm = event.getValue().trim().toLowerCase();
+		    
+		    dataProvider.setFilter(game -> {
+		        if (searchTerm.isEmpty()) return true;
+		        
+		        boolean matches = game.getName() != null && 
+		                              game.getName().toLowerCase().contains(searchTerm);
+		        /*
+		        matches |= game.getStatusname() != null && 
+		                              game.getStatusname().toLowerCase().contains(searchTerm);
+		                              */
+		        return matches;
+		    });
+		});
+		return searchField;
+	}
+
 	@Override
 	public void beforeEnter(BeforeEnterEvent event) {
-		Optional<String> gameId = event.getRouteParameters().get("gameId");
-		this.gameId = gameId.orElse("659148");
-	}
+        String id = event.getRouteParameters().get("gameId").orElse("no ID");
+        String type = event.getRouteParameters().get("gameType").orElse("planets");
+
+		dataProvider.getItems().clear();
+		dataProvider.getItems().addAll(gamesService.getScoresByGameid(id));
+		dataProvider.refreshAll();	
+    }
 
 }

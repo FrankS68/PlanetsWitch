@@ -5,30 +5,23 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
+import java.util.Set;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "game")
+@Node("Game")
 public class Game {
 		
-    @Column(name = "name", nullable = false)
-	String name;
 
 	@Id
-    @Column(name = "id")
-	String id;
+    @GeneratedValue(generatorClass = GeneratedValue.InternalIdGenerator.class) // Oder lass GeneratedValue weg, wenn du accountid nutzt
+    private String id;
+	String gameId;
+	String name;
 	String turn;
-    // @Column(name = "description", nullable = false)
-	// String description;
-    @Column(name = "shortdescription", nullable = false)
 	String shortdescription;
 	String status;
 	String statusname;
@@ -36,6 +29,8 @@ public class Game {
 	Date lasthostdate;
 	ArrayList<Score> scores;
 	ArrayList<Event> events;
+	private boolean scoresLoaded;
+	private boolean detailsLoaded;
 	protected static String[] statusArray = {"Joining","Running","Finished","Hold"};
 
 	public static void parseFromHistory(String game) {
@@ -48,7 +43,7 @@ public class Game {
 		sdf = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 		Game game = new Game();
 		game.name = input.get("name").toString();
-		game.id = input.get("id").toString().replace(".0", "");
+		game.gameId = input.get("id").toString().replace(".0", "");
 		game.turn = input.get("turn").toString();
 		// game.description = input.get("description").toString();
 		game.shortdescription = input.get("shortdescription").toString();
@@ -57,12 +52,12 @@ public class Game {
 		try {
 			game.datecreated = sdf.parse(input.get("datecreated").toString());
 		} catch (ParseException e) {
-			System.err.println(String.format("Error parsing %s for game %s","datecreated", game.id));
+			System.err.println(String.format("Error parsing %s for game %s","datecreated", game.gameId));
 		}
 		if (!game.statusname.equals("Joining")) try {
 			game.lasthostdate = sdf.parse(input.get("lasthostdate").toString());
 		} catch (ParseException e) {
-			System.err.println(String.format("Error parsing %s for game %s","lasthostdate",game.id));
+			System.err.println(String.format("Error parsing %s for game %s","lasthostdate",game.gameId));
 		}
 		return game;
 	}
@@ -106,7 +101,7 @@ public class Game {
 		}
 		catch (Exception exc) {
 			return String.format("Error printing scores for %s:\n%s", 
-					id,exc.getMessage());
+					gameId,exc.getMessage());
 		}
 		// /game/loadscores
 	}
@@ -127,12 +122,12 @@ public class Game {
 		this.name = name;
 	}
 
-	public String getId() {
-		return id;
+	public String getGameId() {
+		return gameId;
 	}
 
-	public void setId(String id) {
-		this.id = id;
+	public void setGameId(String id) {
+		this.gameId = id;
 	}
 
 	/*
@@ -167,5 +162,21 @@ public class Game {
 
 	public void setStatusname(String statusname) {
 		this.statusname = statusname;
+	}
+
+	public boolean getScoresLoaded() {
+		return scoresLoaded;
+	}
+
+	public void setScoresLoaded(boolean b) {
+		scoresLoaded = b;
+	}
+
+	public boolean getDetailsLoaded() {
+		return detailsLoaded;
+	}
+
+	public void setDetailsLoaded(boolean b) {
+		detailsLoaded = b;
 	}
 }

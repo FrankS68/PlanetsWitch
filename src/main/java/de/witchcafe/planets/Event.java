@@ -4,14 +4,19 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import org.springframework.data.annotation.Transient;
+
 import com.google.gson.internal.LinkedTreeMap;
 
 public class Event {
 
 	private static SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy h:mm:ss aaa");
 	private Date dateadded;
+	@Transient
+	private String targetid;
+	@Transient
 	private String 
-		playerid,accountid,targetid,id,
+		playerid,accountid,id,
 		description,
 		eventtype,
 		turn;

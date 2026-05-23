@@ -4,29 +4,25 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import org.springframework.data.annotation.Transient;
+
 import com.google.gson.internal.LinkedTreeMap;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "score")
 public class Score {
 
 	private static SimpleDateFormat sdf = new SimpleDateFormat("dd/M/yyyy H:mm:ss aaa");
 	private Date dateadded;
 
-	@Id
-    @Column(name = "id")
 	private String id;
+	@Transient
+	private String percent;
+	@Transient
 	private String
 		name,accountid,
 		capitalships,freighters,
 		planets,starbases,
 		militaryscore,inventoryscore,prioritypoints,
-		turn,percent,victoryscore;
+		turn,victoryscore;
 	public static Score parse(LinkedTreeMap<String, Object> scoreData) {
 		Score score = new Score();
 		score.name = scoreData.get("name").toString();

@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -19,14 +20,12 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.internal.LinkedTreeMap;
 
 public class PlanetsRestTemplate extends RestTemplate {
-	private byte[] getBytesFromUrl(String requestUrl) {
+	public byte[] getBytesFromUrl(String requestUrl) {
 		byte[] content = new byte[0];
 
-        HttpHeaders httpHeaders = new HttpHeaders();
+        HttpHeaders httpHeaders = createHttpHeaders();
 
-        httpHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
-
-		ResponseEntity<Resource> responseEntity = exchange(requestUrl, HttpMethod.GET,
+		ResponseEntity<Resource> responseEntity = exchange(secureUrl(requestUrl), HttpMethod.GET,
                 new HttpEntity<>(httpHeaders), Resource.class);
 
         if (!responseEntity.getStatusCode().is2xxSuccessful()) {
@@ -61,121 +60,59 @@ public class PlanetsRestTemplate extends RestTemplate {
         }
 		return content;
 	}
-	
-	public LinkedTreeMap<String, Object> getLinkedTreeMapFromUrl(String requestUrl) {
-		LinkedTreeMap<String, Object> result = new Gson().fromJson(
-				new String(getBytesFromUrl(requestUrl)), LinkedTreeMap.class);
-		return result;
+
+	protected String secureUrl(String requestUrl) {
+		return requestUrl;
 	}
 
-	public ArrayList<Map> getArrayListFromUrl(String requestUrl) {
-		ArrayList<Map> result = new Gson().fromJson(
-				new String(getBytesFromUrl(requestUrl)), ArrayList.class);
-		return result;
+	protected HttpHeaders createHttpHeaders() {
+		HttpHeaders httpHeaders = new HttpHeaders();
+
+        httpHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
+		return httpHeaders;
 	}
 
-	public Object getObjectFromUrl(String requestUrl) {
-		Object result = new Gson().fromJson(
-				new String(getBytesFromUrl(requestUrl)), Object.class);
-		return result;
-	}
-
-	private String scoresByGameid(String gameid) {
+	public String scoresByGameid(String gameid) {
 		return String.format("http://api.planets.nu/game/loadscores?gameid=%s",gameid);
 	}
 
-	private String eventsByGameid(String gameid) {
+	public String eventsByGameid(String gameid) {
 		return String.format("http://api.planets.nu/game/loadevents?gameid=%s",gameid);
 	}
 
-	private String activeGamesByUsername(String username) {
+	public String loadCompleteGame(String gameid) {
+		return String.format("http://api.planets.nu/game/loadall?gameid=%s",gameid);
+	}
+
+	public String loadGameInfo(String gameid) {
+		return String.format("http://api.planets.nu/game/loadinfo?gameid=%s",gameid);
+	}
+
+	public String loadGame(String gameid) {
+		return String.format("http://api.planets.nu/game/details?id=%s",gameid);
+	}
+
+	public String activeGamesByUsername(String username) {
 		return String.format("http://api.planets.nu/games/list?username=%s",username);
 	}
 
-	private String accountHistoryByAccountId(String accountid) {
+	public String accountHistoryByAccountId(String accountid) {
 		return String.format("http://api.planets.nu/account/history?accountid=%s",accountid);
 	}
 
-	private String officerByUsername(String username) {
+	public String officerByUsername(String username) {
 		return String.format("http://api.planets.nu/account/loadofficer?officerid=%s",username);
 	}
 
-	private String loadAccount(String username) {
+	public String loadAccount(String username) {
 		return String.format("http://api.planets.nu/account/load?username=%s",username);
 	}
 
-	private String profileByUsername(String username) {
+	public String profileByUsername(String username) {
 		return String.format("http://api.planets.nu/account/loadprofile?username=%s",username);
 	}
 	
-	private String finishedGamesByUsername(String username) {
+	public String finishedGamesByUsername(String username) {
 		return String.format("http://api.planets.nu/games/list?status=3,4&username=%s",username);
 	}
-
-	public ArrayList<Score> getScoresByGameid(String gameid) {
-		ArrayList<Score> allScores = new ArrayList<Score>();
-		LinkedTreeMap<String, Object> scoreMap = getLinkedTreeMapFromUrl(scoresByGameid(gameid));
-		((ArrayList<LinkedTreeMap<String, Object>>)scoreMap.get("scores")).forEach(scoreData -> {
-			Score score = Score.parse(scoreData);
-			allScores.add(score);
-			// System.out.println(score);
-		});
-		return allScores;
-	}
-
-	public ArrayList<Event> getEventsByGameid(String gameid) {
-		ArrayList<Event> allEvents = new ArrayList<Event>();
-		LinkedTreeMap<String, Object> eventMap = getLinkedTreeMapFromUrl(eventsByGameid(gameid));
-		((ArrayList<LinkedTreeMap<String, Object>>)eventMap.get("events")).forEach(eventData -> {
-			Event event = Event.parse(eventData);
-			allEvents.add(event);
-			// System.out.println(score);
-		});
-		return allEvents;
-	}
-	
-	public ArrayList<Game> getActiveGamesByUsername(String username) {
-		String requestUrl = activeGamesByUsername(username);
-		try {
-			ArrayList<Map> result = getArrayListFromUrl(requestUrl);
-			ArrayList<Game> games = new ArrayList<Game>();
-	        
-	        result.forEach(gameToken -> {
-	        	games.add(Game.parse(gameToken));
-	        	
-	        	});
-	        return games; 
-		}
-		catch (JsonSyntaxException exc) {
-			System.err.println(getObjectFromUrl(requestUrl).getClass().getName());
-			return null;
-		}
-	}
-
-	
-	public ArrayList<GameHistory> getAccountHistory(String accountid) {
-
-		String requestUrl = accountHistoryByAccountId(accountid);
-		try {
-			LinkedTreeMap<String, Object> result = getLinkedTreeMapFromUrl(requestUrl);
-			ArrayList<LinkedTreeMap> gameJSons = (ArrayList<LinkedTreeMap>) result.get("history");
-			ArrayList<GameHistory> games = new ArrayList<GameHistory>();
-			
-			if (gameJSons.size() == 0) {
-				throw new RuntimeException("Result seems empty");
-			}
-	        
-	        gameJSons.forEach(game -> {
-	        	GameHistory gameHistory = GameHistory.parse(game);
-	        	games.add(gameHistory);
-	        	});
-	        return games;
-		}
-		catch (JsonSyntaxException exc) {
-			System.err.println(getObjectFromUrl(requestUrl).getClass().getName());
-			return null;
-		}
-        
-    }
-
 }
