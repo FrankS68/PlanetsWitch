@@ -12,3 +12,9 @@
 node_modules/
 src/main/frontend/generated/
 vite.generated.ts
+
+# game archives downloaded via /game/loadall
+/data/
+
+# planets.nu login and neo4j password, see planets-credentials.properties.example
+/planets-credentials.properties

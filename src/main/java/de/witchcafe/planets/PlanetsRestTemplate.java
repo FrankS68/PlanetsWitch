@@ -2,7 +2,11 @@ package de.witchcafe.planets;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +63,30 @@ public class PlanetsRestTemplate extends RestTemplate {
             // TODO
         }
 		return content;
+	}
+
+	/**
+	 * Streams a binary response (e.g. the ZIP from /game/loadall) into the given file.
+	 * The API answers errors with a small JSON body instead of the file, so that case is
+	 * detected and turned into an exception.
+	 */
+	public Path downloadToFile(String requestUrl, Path target) throws IOException {
+		Files.createDirectories(target.toAbsolutePath().getParent());
+		Path tmp = target.resolveSibling(target.getFileName() + ".part");
+		execute(secureUrl(requestUrl), HttpMethod.GET, null, response -> {
+			Files.copy(response.getBody(), tmp, StandardCopyOption.REPLACE_EXISTING);
+			return null;
+		});
+		byte[] head = new byte[2];
+		try (InputStream in = Files.newInputStream(tmp)) {
+			in.readNBytes(head, 0, 2);
+		}
+		if (head[0] != 'P' || head[1] != 'K') {
+			String body = Files.readString(tmp);
+			Files.deleteIfExists(tmp);
+			throw new IOException(String.format("no zip returned by %s: %s", requestUrl, body));
+		}
+		return Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	protected String secureUrl(String requestUrl) {

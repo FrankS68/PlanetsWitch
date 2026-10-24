@@ -31,6 +31,7 @@ public class Game {
 	ArrayList<Event> events;
 	private boolean scoresLoaded;
 	private boolean detailsLoaded;
+	private boolean archiveLoaded;
 	protected static String[] statusArray = {"Joining","Running","Finished","Hold"};
 
 	public static void parseFromHistory(String game) {
@@ -170,6 +171,14 @@ public class Game {
 
 	public void setScoresLoaded(boolean b) {
 		scoresLoaded = b;
+	}
+
+	public boolean getArchiveLoaded() {
+		return archiveLoaded;
+	}
+
+	public void setArchiveLoaded(boolean b) {
+		archiveLoaded = b;
 	}
 
 	public boolean getDetailsLoaded() {

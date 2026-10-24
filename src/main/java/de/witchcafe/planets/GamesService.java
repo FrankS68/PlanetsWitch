@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +22,7 @@ public class GamesService {
 
     private final GamesRepository gamesRepository;
     private final PlayerRepository playerRepository;
-	AuthenticatedPlanetsRestTemplate apTemplate = new AuthenticatedPlanetsRestTemplate();
+	AuthenticatedPlanetsRestTemplate apTemplate;
 	PlanetsRestTemplate pTemplate = new PlanetsRestTemplate();
 
 	String[] mypois = new String[] {
@@ -41,9 +42,12 @@ public class GamesService {
 	
     GamesService(
     		GamesRepository gamesRepository,
-    		PlayerRepository playerRepository) {
+    		PlayerRepository playerRepository,
+    		@Value("${planets.username:}") String planetsUsername,
+    		@Value("${planets.password:}") String planetsPassword) {
         this.gamesRepository = gamesRepository;
         this.playerRepository = playerRepository;
+        this.apTemplate = new AuthenticatedPlanetsRestTemplate(planetsUsername, planetsPassword);
     }
 
     @EventListener(ApplicationReadyEvent.class)
