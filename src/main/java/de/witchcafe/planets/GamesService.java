@@ -1,5 +1,6 @@
 package de.witchcafe.planets;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -22,6 +23,8 @@ public class GamesService {
 
     private final GamesRepository gamesRepository;
     private final PlayerRepository playerRepository;
+    private final OfficerRepository officerRepository;
+    private final OfficerSnapshotRepository snapshotRepository;
 	AuthenticatedPlanetsRestTemplate apTemplate;
 	PlanetsRestTemplate pTemplate = new PlanetsRestTemplate();
 
@@ -43,10 +46,14 @@ public class GamesService {
     GamesService(
     		GamesRepository gamesRepository,
     		PlayerRepository playerRepository,
+    		OfficerRepository officerRepository,
+    		OfficerSnapshotRepository snapshotRepository,
     		@Value("${planets.username:}") String planetsUsername,
     		@Value("${planets.password:}") String planetsPassword) {
         this.gamesRepository = gamesRepository;
         this.playerRepository = playerRepository;
+        this.officerRepository = officerRepository;
+        this.snapshotRepository = snapshotRepository;
         this.apTemplate = new AuthenticatedPlanetsRestTemplate(planetsUsername, planetsPassword);
     }
 
@@ -259,7 +266,7 @@ public class GamesService {
 			gameJSons.forEach(game -> {
 				try {
 					GameHistory gameHistory = GameHistory.parse(game);
-					saveOrUpdate(gameHistory.game);
+					gameHistory.game = saveOrUpdate(gameHistory.game);
 					games.add(gameHistory);
 				} catch (Exception exc) {
 					System.err.println(String.format("Error: %s\nparsing gamehistory\n%s", exc.getMessage(), game));
@@ -274,6 +281,10 @@ public class GamesService {
 				player.setAccountId(accountid);
 			}
 			if (player != null) {
+				for (GameHistory gameHistory : games) {
+					player.linkGame(gameHistory.game, gameHistory.raceid,
+							gameHistory.turnjoined, gameHistory.turnleft, gameHistory.finishrank);
+				}
 				player.setHistoryLoaded(new Date());
 				playerRepository.save(player);
 			}
@@ -288,6 +299,10 @@ public class GamesService {
 
 	public LinkedTreeMap<String, Object> getGameInfo(String gameId) {
 		LinkedTreeMap<String, Object> gameInfo = getLinkedTreeMapFromUrl(getPlanetsTemplate().loadGameInfo(gameId));
+		if (gameInfo == null) {
+			System.err.println(String.format("no game info returned for gameid [%s]", gameId));
+			return null;
+		}
 		ArrayList<LinkedTreeMap<String, Object>> players = (ArrayList<LinkedTreeMap<String, Object>>) gameInfo.get("players");
 		if (players != null && players.size() > 0) {
 			players.forEach(playerData -> {
@@ -308,6 +323,48 @@ public class GamesService {
 		game.setDetailsLoaded(true);
 		gamesRepository.save(game);
 		return gameInfo;
+	}
+
+	/**
+	 * Loads the leaderboard and stores the top officers of every race,
+	 * each linked to its player (created if not yet known) via "officerOf".
+	 * Also keeps one snapshot per officer and day for the history chart.
+	 */
+	@Transactional()
+	public ArrayList<Officer> loadTopOfficers() {
+		ArrayList<Officer> officers = new ArrayList<Officer>();
+		Date loaded = new Date();
+		LocalDate today = LocalDate.now();
+		LinkedTreeMap<String, Object> leaderboard = getLinkedTreeMapFromUrl(pTemplate.leaderboard());
+		// one list per race, index = raceid (index 0 is empty)
+		ArrayList<ArrayList<LinkedTreeMap<String, Object>>> topOfficers =
+				(ArrayList<ArrayList<LinkedTreeMap<String, Object>>>) leaderboard.get("topofficers");
+		topOfficers.forEach(raceOfficers -> {
+			for (int rank = 0; rank < raceOfficers.size(); rank++) {
+				LinkedTreeMap<String, Object> officerData = raceOfficers.get(rank);
+				Officer parsed = Officer.parse(officerData);
+				Officer officer = officerRepository.findByOfficerId(parsed.getOfficerId());
+				if (officer == null) {
+					officer = parsed;
+				} else {
+					officer.update(parsed);
+				}
+				officer.setRank(rank + 1);
+				officer.setTopOfficerLoaded(loaded);
+				saveOrUpdatePlayer(officerData);
+				officer.setPlayer(playerRepository.findByAccountid(officer.getAccountid()));
+				officer = officerRepository.save(officer);
+				OfficerSnapshot snapshot = snapshotRepository.findByOfficerIdAndDay(officer.getOfficerId(), today);
+				if (snapshot == null) {
+					snapshot = OfficerSnapshot.of(officer, today);
+				} else {
+					snapshot.update(officer);
+				}
+				snapshotRepository.save(snapshot);
+				officers.add(officer);
+			}
+		});
+		return officers;
 	}
 
 	public AuthenticatedPlanetsRestTemplate getPlanetsTemplate() {

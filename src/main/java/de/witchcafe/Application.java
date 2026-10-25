@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.data.neo4j.repository.config.EnableNeo4jRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dependency.NpmPackage;
@@ -23,6 +24,7 @@ import com.vaadin.flow.theme.lumo.Lumo;
 // @NpmPackage(value = "@webcomponents/shadycss", version = "1.11.2")
 @EnableNeo4jRepositories(basePackages = "de.witchcafe.planets")
 @EntityScan(basePackages = "de.witchcafe.planets")
+@EnableScheduling
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {

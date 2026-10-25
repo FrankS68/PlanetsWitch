@@ -51,6 +51,7 @@ class GameListView extends Main {
         gameGrid.getColumnByKey("scores").setVisible(false);
         gameGrid.getColumnByKey("scoresLoaded").setVisible(false);
         gameGrid.getColumnByKey("detailsLoaded").setVisible(false);
+        gameGrid.getColumnByKey("archiveLoaded").setVisible(false);
         gameGrid.getColumnByKey("gameId").setVisible(false);
         gameGrid.getColumnByKey("turn").setWidth("10%");
         gameGrid.getColumnByKey("datecreated").setWidth("20%");
@@ -97,7 +98,8 @@ class GameListView extends Main {
         		gameGrid.getColumnByKey("gameId"),
         		gameGrid.getColumnByKey("scores"),
         		gameGrid.getColumnByKey("scoresLoaded"),
-        		gameGrid.getColumnByKey("detailsLoaded"));
+        		gameGrid.getColumnByKey("detailsLoaded"),
+        		gameGrid.getColumnByKey("archiveLoaded"));
 
         gameGrid.setDataProvider(dataProvider);
         // gameGrid.addColumn(Game::getName).setHeader("Name").setFlexGrow(30).setWidth("0px");

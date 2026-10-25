@@ -47,7 +47,7 @@ public class Game {
 		game.gameId = input.get("id").toString().replace(".0", "");
 		game.turn = input.get("turn").toString();
 		// game.description = input.get("description").toString();
-		game.shortdescription = input.get("shortdescription").toString();
+		game.shortdescription = input.get("shortdescription") == null ? "" : input.get("shortdescription").toString();
 		game.status = input.get("status").toString();
 		game.statusname = input.get("statusname").toString();
 		try {
@@ -55,7 +55,7 @@ public class Game {
 		} catch (ParseException e) {
 			System.err.println(String.format("Error parsing %s for game %s","datecreated", game.gameId));
 		}
-		if (!game.statusname.equals("Joining")) try {
+		if (!game.statusname.equals("Joining") && input.get("lasthostdate") != null) try {
 			game.lasthostdate = sdf.parse(input.get("lasthostdate").toString());
 		} catch (ParseException e) {
 			System.err.println(String.format("Error parsing %s for game %s","lasthostdate",game.gameId));

@@ -140,6 +140,10 @@ public class PlanetsRestTemplate extends RestTemplate {
 		return String.format("http://api.planets.nu/account/loadprofile?username=%s",username);
 	}
 	
+	public String leaderboard() {
+		return "http://api.planets.nu/account/leaderboard";
+	}
+
 	public String finishedGamesByUsername(String username) {
 		return String.format("http://api.planets.nu/games/list?status=3,4&username=%s",username);
 	}

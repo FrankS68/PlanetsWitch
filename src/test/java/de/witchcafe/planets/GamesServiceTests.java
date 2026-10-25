@@ -53,6 +53,16 @@ class GamesServiceTests {
     }
 	
 	@Test
+	void testLoadTopOfficers() {
+		ArrayList<Officer> officers = gameService.loadTopOfficers();
+		assertNotEquals(0, officers.size(),"Result seems empty");
+		officers.forEach(officer -> {
+			assertNotNull(officer.getPlayer(), String.format("no player for officer %s", officer));
+			System.out.println(officer);
+		});
+	}
+
+	@Test
 	void testLoadGameInfo() {
 		gameService.getGameInfo("665581");
 	}
