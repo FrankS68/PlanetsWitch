@@ -54,4 +54,27 @@ public class GameAnalysisService {
 		analyses.sort(Comparator.comparingLong(GameAnalysis::gameId).reversed().thenComparingInt(GameAnalysis::slot));
 		return analyses;
 	}
+
+	/** all player analyses (tools/player_analysis.py), sorted by username */
+	public List<PlayerAnalysis> findAllPlayers() {
+		List<PlayerAnalysis> analyses = new ArrayList<>();
+		if (!Files.isDirectory(analysisDir)) {
+			return analyses;
+		}
+		try (Stream<Path> files = Files.list(analysisDir)) {
+			files.filter(file -> file.getFileName().toString().matches("player-.+\\.json")).forEach(file -> {
+				try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+					analyses.add(gson.fromJson(reader, PlayerAnalysis.class));
+				}
+				catch (Exception exc) {
+					System.err.println(String.format("reading player analysis %s failed: %s", file, exc.getMessage()));
+				}
+			});
+		}
+		catch (IOException exc) {
+			System.err.println(String.format("listing %s failed: %s", analysisDir, exc.getMessage()));
+		}
+		analyses.sort(Comparator.comparing(PlayerAnalysis::username, String.CASE_INSENSITIVE_ORDER));
+		return analyses;
+	}
 }
