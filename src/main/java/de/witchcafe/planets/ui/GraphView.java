@@ -5,7 +5,9 @@ import org.springframework.beans.factory.annotation.Value;
 import com.google.gson.Gson;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dependency.JavaScript;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.NativeButton;
@@ -20,14 +22,16 @@ import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.Route;
 
 import de.witchcafe.base.ui.component.ViewToolbar;
+import de.witchcafe.planets.ui.GraphFilter.Condition;
+import de.witchcafe.planets.ui.GraphFilter.Operator;
 
 @Route("graph")
 @Menu(order = 0, icon = "vaadin:clipboard-check", title = "Graph")
 @JavaScript("./dist/neovis.js")
 public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
-	private static final String DEFAULT_CYPHER = "MATCH (n)-[r]->(m) RETURN n,r,m";
-	private String initialCypher = DEFAULT_CYPHER;
+	private final GraphFilter filter = new GraphFilter(Condition.all());
+	private GraphFilterDialog filterDialog;
 
 	TextField searchField;
 	NativeButton searchButton;
@@ -49,7 +53,8 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         add(new ViewToolbar(
         		"Advanced neovis example", 
         		ViewToolbar.group(
-        				getSearchField(), 
+        				new Button("Filter", new Icon(VaadinIcon.FILTER), e -> getFilterDialog().open()),
+        				getSearchField(),
         				getSearchButton(),
         				getSearchMeButton(),
         				getSearchUnconnectedButton(),
@@ -67,13 +72,38 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
     }
     
     public void filterGraph(String searchString) {
-        String query = "MATCH (n:Game) WHERE n.name STARTS WITH '" + searchString + "' " +
-                       "MATCH (n)-[r]-(m) RETURN n, r, m LIMIT 100";
-        
-        // Wir nutzen das globale viz Objekt aus deinem Script
-        UI.getCurrent().getPage().executeJs("window.updateWithCypher($0);", searchString);
+        getFilterDialog().setCustomCypher(searchString);
+        renderCypher(searchString);
     }
-    
+
+    /** replaces the shown graph */
+    private void renderCypher(String cypher) {
+        UI.getCurrent().getPage().executeJs("window.updateWithCypher($0);", cypher);
+    }
+
+    private void renderFilter() {
+        getFilterDialog().refresh();
+        renderCypher(filter.toCypher());
+    }
+
+    private GraphFilterDialog getFilterDialog() {
+        if (filterDialog == null) {
+            filterDialog = new GraphFilterDialog(filter, this::renderCypher);
+        }
+        return filterDialog;
+    }
+
+    /**
+     * Called from the context menu after data was loaded: the loaded nodes become an OR branch
+     * of the filter and are added to the graph without reloading it.
+     */
+    @ClientCallable
+    public void addToFilter(String label, String property, String value) {
+        Condition condition = filter.addAlternative(new Condition(label, property, Operator.EQUALS, value));
+        getFilterDialog().refresh();
+        getElement().executeJs("window.visualisation.getVisualisation().updateWithCypher($0);", GraphFilter.toCypher(condition));
+    }
+
 	private TextField getSearchField() {
 		// Das Suchfeld erstellen
 		searchField = new TextField();
@@ -135,7 +165,10 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 	private NativeButton getSearchMeButton() {
 		NativeButton button = new NativeButton(
 		        "SearchMe");
-		button.addClickListener(e -> filterGraph("MATCH (p:Player)-[r:playedIn]->(g:Game) WHERE p.name IN [\"lomize\", \"hawkeye418\", \"gráinne\", \"moulliez d\"] RETURN p, r, g"));
+		button.addClickListener(e -> {
+			filter.reset(new Condition("Player", "name", Operator.IN, "lomize, hawkeye418, gráinne, moulliez d"));
+			renderFilter();
+		});
 		return button;
 	} // 
 	
@@ -155,10 +188,13 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
      */
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        initialCypher = event.getLocation().getQueryParameters().getSingleParameter("player")
+        filter.reset(event.getLocation().getQueryParameters().getSingleParameter("player")
         		.filter(accountId -> accountId.matches("[0-9]+"))
-        		.map(accountId -> String.format("MATCH (p:Player {accountid: '%s'})-[r]-(m) RETURN p, r, m", accountId))
-        		.orElse(DEFAULT_CYPHER);
+        		.map(accountId -> new Condition("Player", "accountid", Operator.EQUALS, accountId))
+        		.orElse(Condition.all()));
+        if (filterDialog != null) {
+        	filterDialog.refresh();
+        }
     }
 
     @Override
@@ -169,6 +205,8 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         getElement().executeJs(cssScript);
         String script = withNeo4jConfig(createVizScriptEmbedded());
         getElement().executeJs(script);
+        // the context menu reports loaded data back to this view
+        getElement().executeJs("window.graphView = this;");
         getElement().executeJs(createSetup());
         getElement().executeJs("drawembedded()");
         getElement().executeJs("setupContextMenu()");
@@ -346,23 +384,31 @@ window.setupContextMenu = function() {
     document.getElementById('viz').oncontextmenu = (e) => e.preventDefault();
 }
 
+// loads the data into neo4j, then the view adds the node as OR branch to the filter and to the graph
+window.loadAndAdd = function(url, label, property, value) {
+	fetch(url).then(res => res.text()).then(text => {
+		console.log(text);
+		window.graphView.$server.addToFilter(label, property, value);
+	});
+}
+
 window.handleMenuAction = function(type) {
 	var reset = false;
 	if (!selectedNodeData) return;
 	const p = selectedNodeData.raw.properties;
 
 	if (type === 'players'){
-		fetch(`/api/gameinfos/${p.gameId}`).then(res => res.text()).then(console.log);
+		loadAndAdd(`/api/gameinfos/${p.gameId}`, 'Game', 'gameId', p.gameId);
 		reset = true;
 	}
 	if (type === 'scores') window.location.href = `http://localhost:8081/rawscores/${p.gameId}`;
 	if (type === 'details') window.location.href = `http://localhost:8081/details/${p.gameId}`;
 	if (type === 'active'){
-		fetch(`/api/active/${p.name}`).then(res => res.text()).then(console.log);
+		loadAndAdd(`/api/active/${p.name}`, 'Player', 'accountid', p.accountid);
 		reset = true;
 	}
 	if (type === 'history'){
-		fetch(`/api/history/${p.accountid}`).then(res => res.text()).then(console.log);
+		loadAndAdd(`/api/history/${p.accountid}`, 'Player', 'accountid', p.accountid);
 		reset = true;
 	}
 	// archive downloads can take minutes and don't change the graph, so only report the result
@@ -380,10 +426,7 @@ window.handleMenuAction = function(type) {
 	if (reset){
 		document.getElementById('player-context-menu').style.display = 'none';
 		document.getElementById('game-context-menu').style.display = 'none';
-		window.visualisation.getVisualisation().clearNetwork();
-		window.visualisation.getVisualisation().render()
 	}
-	document.getElementById('context-menu').style.display = 'none';
 }
 
 	""";
@@ -434,7 +477,7 @@ window.handleMenuAction = function(type) {
 				.replace("__NEO4J_URI__", gson.toJson(neo4jUri))
 				.replace("__NEO4J_USER__", gson.toJson(neo4jUser))
 				.replace("__NEO4J_PASSWORD__", gson.toJson(neo4jPassword))
-				.replace("__INITIAL_CYPHER__", gson.toJson(initialCypher));
+				.replace("__INITIAL_CYPHER__", gson.toJson(filter.toCypher()));
 	}
 
 	private String createLabelSection() {
