@@ -2,6 +2,8 @@ package de.witchcafe.planets.ui;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.util.Date;
+import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -17,15 +19,22 @@ import org.jfree.svg.SVGGraphics2D;
 import org.jfree.svg.ViewBox;
 
 import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
+import de.witchcafe.planets.Officer;
+import de.witchcafe.planets.OfficerRepository;
 import de.witchcafe.planets.OfficerSnapshot;
 import de.witchcafe.planets.OfficerSnapshotRepository;
 
@@ -49,12 +58,16 @@ public class TopOfficerChartView extends VerticalLayout {
 	}};
 
 	private final OfficerSnapshotRepository snapshotRepository;
+	private final OfficerRepository officerRepository;
+	private final Grid<Officer> officerGrid = new Grid<>();
 	private final Select<Integer> raceSelect = new Select<>();
 	private final Select<String> metricSelect = new Select<>();
 	private final VerticalLayout chartArea = new VerticalLayout();
 
-	TopOfficerChartView(OfficerSnapshotRepository snapshotRepository) {
+	TopOfficerChartView(OfficerSnapshotRepository snapshotRepository, OfficerRepository officerRepository) {
 		this.snapshotRepository = snapshotRepository;
+		this.officerRepository = officerRepository;
+		createOfficerGrid();
 
 		raceSelect.setLabel("Rasse");
 		raceSelect.setItems(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
@@ -69,19 +82,49 @@ public class TopOfficerChartView extends VerticalLayout {
 		metricSelect.addValueChangeListener(event -> refresh());
 
 		chartArea.setPadding(false);
-		add(new HorizontalLayout(raceSelect, metricSelect), chartArea);
+		add(new HorizontalLayout(raceSelect, metricSelect), officerGrid, chartArea);
 		setSizeFull();
 		refresh();
+	}
+
+	private void createOfficerGrid() {
+		officerGrid.addColumn(Officer::getRank).setHeader("Platz").setAutoWidth(true).setFlexGrow(0);
+		officerGrid.addColumn(Officer::getUsername).setHeader("Spieler").setAutoWidth(true);
+		officerGrid.addColumn(Officer::getLevelname).setHeader("Rang").setAutoWidth(true);
+		officerGrid.addColumn(Officer::getRating).setHeader("Rating").setAutoWidth(true);
+		officerGrid.addColumn(Officer::getExperience).setHeader("Erfahrung").setAutoWidth(true);
+		officerGrid.addColumn(Officer::getTonssunk).setHeader("Versenkte Tonnage").setAutoWidth(true);
+		officerGrid.addComponentColumn(officer -> {
+			Button graph = new Button("Graph", VaadinIcon.CLUSTER.create(), event -> getUI().ifPresent(ui ->
+					ui.navigate("graph", QueryParameters.simple(Map.of("player", officer.getAccountid())))));
+			Button games = new Button("Spiele", VaadinIcon.LIST.create(), event -> getUI().ifPresent(ui ->
+					ui.navigate("Games", QueryParameters.simple(Map.of(
+							"player", officer.getAccountid(), "name", officer.getUsername())))));
+			graph.addThemeVariants(ButtonVariant.LUMO_SMALL);
+			games.addThemeVariants(ButtonVariant.LUMO_SMALL);
+			return new HorizontalLayout(graph, games);
+		}).setHeader("Anzeigen").setAutoWidth(true);
+		officerGrid.setAllRowsVisible(true);
+	}
+
+	/** the officers of the race from the latest leaderboard load (former top officers keep their old rank) */
+	private List<Officer> currentOfficers(Integer raceId) {
+		List<Officer> officers = officerRepository.findByRaceidOrderByRankAsc(raceId);
+		Date latest = officers.stream().map(Officer::getTopOfficerLoaded)
+				.filter(java.util.Objects::nonNull).max(Date::compareTo).orElse(null);
+		return officers.stream().filter(officer -> latest == null || latest.equals(officer.getTopOfficerLoaded())).toList();
 	}
 
 	private void refresh() {
 		chartArea.removeAll();
 		List<OfficerSnapshot> snapshots;
 		try {
+			officerGrid.setItems(currentOfficers(raceSelect.getValue()));
 			snapshots = snapshotRepository.findByRaceidOrderByDayAsc(raceSelect.getValue());
 		}
 		catch (Exception exc) {
 			System.err.println(String.format("loading top officer snapshots failed: %s", exc.getMessage()));
+			officerGrid.setItems(List.of());
 			chartArea.add(new Span("Die Datenbank ist nicht erreichbar. Läuft Neo4j?"));
 			return;
 		}

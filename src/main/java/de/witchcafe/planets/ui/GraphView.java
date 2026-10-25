@@ -14,6 +14,8 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.Route;
 
@@ -22,7 +24,10 @@ import de.witchcafe.base.ui.component.ViewToolbar;
 @Route("graph")
 @Menu(order = 0, icon = "vaadin:clipboard-check", title = "Graph")
 @JavaScript("./dist/neovis.js")
-public class GraphView extends VerticalLayout {
+public class GraphView extends VerticalLayout implements BeforeEnterObserver {
+
+	private static final String DEFAULT_CYPHER = "MATCH (n)-[r]->(m) RETURN n,r,m";
+	private String initialCypher = DEFAULT_CYPHER;
 
 	TextField searchField;
 	NativeButton searchButton;
@@ -144,6 +149,18 @@ public class GraphView extends VerticalLayout {
 
 	 */
 
+    /**
+     * graph?player=<accountid> starts with that player and everything connected to it
+     * (games, officers) instead of the whole graph.
+     */
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        initialCypher = event.getLocation().getQueryParameters().getSingleParameter("player")
+        		.filter(accountId -> accountId.matches("[0-9]+"))
+        		.map(accountId -> String.format("MATCH (p:Player {accountid: '%s'})-[r]-(m) RETURN p, r, m", accountId))
+        		.orElse(DEFAULT_CYPHER);
+    }
+
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
@@ -214,7 +231,7 @@ window.drawembedded = function() {
 				}
 			},
 		},
-		initialCypher: 'MATCH (n)-[r]->(m) RETURN n,r,m',
+		initialCypher: __INITIAL_CYPHER__,
 		labels: {
 			Game: {
 				label: 'name',
@@ -416,7 +433,8 @@ window.handleMenuAction = function(type) {
 		return script
 				.replace("__NEO4J_URI__", gson.toJson(neo4jUri))
 				.replace("__NEO4J_USER__", gson.toJson(neo4jUser))
-				.replace("__NEO4J_PASSWORD__", gson.toJson(neo4jPassword));
+				.replace("__NEO4J_PASSWORD__", gson.toJson(neo4jPassword))
+				.replace("__INITIAL_CYPHER__", gson.toJson(initialCypher));
 	}
 
 	private String createLabelSection() {

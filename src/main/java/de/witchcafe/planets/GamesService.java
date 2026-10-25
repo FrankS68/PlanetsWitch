@@ -103,6 +103,10 @@ public class GamesService {
 		if (storedGame == null) {
 			System.out.println(String.format("looking up gameid [%s]. returned game list is null.",game.getGameId()));
 			gamesRepository.save(game);					
+		} else if (storedGame.getDatecreated() == null && game.getDatecreated() != null) {
+			// games stored from the account history before its date format was understood
+			storedGame.setDatecreated(game.getDatecreated());
+			gamesRepository.save(storedGame);
 		}
 		return gamesRepository.findByGameId(game.getGameId());
 	}
@@ -114,6 +118,11 @@ public class GamesService {
 
     public List<Game> findAll() {
         return gamesRepository.findAll();
+    }
+
+    /** games the player with this account id is linked to via playedIn */
+    public List<Game> findByPlayer(String accountid) {
+        return gamesRepository.findByPlayer(accountid);
     }
 
     public Game getGame(String id) {

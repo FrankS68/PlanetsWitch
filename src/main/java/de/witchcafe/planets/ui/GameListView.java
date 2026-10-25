@@ -8,7 +8,9 @@ import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.Main;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -17,6 +19,8 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.function.SerializableFunction;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -35,13 +39,17 @@ import de.witchcafe.planets.GamesService;
 @AnonymousAllowed
 
 @Menu(order = 0, icon = "vaadin:clipboard-check", title = "Game List")
-class GameListView extends Main {
+class GameListView extends Main implements BeforeEnterObserver {
 
     private final GamesService gamesService;
 
     final Grid<Game> gameGrid;
 
 	private ListDataProvider<Game> dataProvider;
+
+	/** account id from Games?player=..., null shows all games */
+	private String playerFilter;
+	private final HorizontalLayout filterInfo = new HorizontalLayout();
 
     GameListView(GamesService gamesService) {
         this.gamesService = gamesService;
@@ -139,13 +147,25 @@ class GameListView extends Main {
                 LumoUtility.Padding.MEDIUM, LumoUtility.Gap.SMALL);
 
         add(new ViewToolbar("Game List", ViewToolbar.group(getSearchField())));
-        add(gameGrid);
+        add(filterInfo, gameGrid);
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        String name = event.getLocation().getQueryParameters().getSingleParameter("name").orElse(null);
+        playerFilter = event.getLocation().getQueryParameters().getSingleParameter("player").orElse(null);
+        filterInfo.removeAll();
+        filterInfo.setVisible(playerFilter != null);
+        if (playerFilter != null) {
+        	filterInfo.add(new Span(String.format("Spiele von %s", name == null ? playerFilter : name)),
+        			new Anchor("Games", "alle Spiele anzeigen"));
+        }
     }
     
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        List<Game> all = gamesService.findAll();
+        List<Game> all = playerFilter == null ? gamesService.findAll() : gamesService.findByPlayer(playerFilter);
         
 		dataProvider.getItems().clear();
 		dataProvider.getItems().addAll(all);

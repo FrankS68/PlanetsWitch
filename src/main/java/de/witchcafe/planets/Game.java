@@ -40,8 +40,6 @@ public class Game {
 	}
 
 	public static Game parse(Map input) {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-		sdf = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 		Game game = new Game();
 		game.name = input.get("name").toString();
 		game.gameId = input.get("id").toString().replace(".0", "");
@@ -51,16 +49,24 @@ public class Game {
 		game.status = input.get("status").toString();
 		game.statusname = input.get("statusname").toString();
 		try {
-			game.datecreated = sdf.parse(input.get("datecreated").toString());
+			game.datecreated = parseDate(input.get("datecreated").toString());
 		} catch (ParseException e) {
 			System.err.println(String.format("Error parsing %s for game %s","datecreated", game.gameId));
 		}
 		if (!game.statusname.equals("Joining") && input.get("lasthostdate") != null) try {
-			game.lasthostdate = sdf.parse(input.get("lasthostdate").toString());
+			game.lasthostdate = parseDate(input.get("lasthostdate").toString());
 		} catch (ParseException e) {
 			System.err.println(String.format("Error parsing %s for game %s","lasthostdate",game.gameId));
 		}
 		return game;
+	}
+
+	/** games/list sends "MM/dd/yyyy HH:mm:ss", account/history sends "yyyy-MM-ddTHH:mm:ss" */
+	private static Date parseDate(String value) throws ParseException {
+		if (value.contains("T")) {
+			return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(value);
+		}
+		return new SimpleDateFormat("MM/dd/yyyy HH:mm:ss").parse(value);
 	}
 
 	public void setEvents(ArrayList<Event> e) {
