@@ -462,7 +462,16 @@ window.handleMenuAction = function(type) {
 	if (type === 'archiveFinished'){
 		fetch(`/api/archive/finished/${p.name}`).then(res => res.text()).then(alert);
 	}
-	if (type === 'archive' || type === 'archiveFinished'){
+	// the analysis of the last finished games takes some seconds, then its view opens
+	if (type === 'playerAnalysis'){
+		document.body.style.cursor = 'wait';
+		fetch(`/api/playeranalysis/${encodeURIComponent(p.name)}`).then(res => {
+			document.body.style.cursor = '';
+			if (res.ok) window.location.href = `/playeranalysis?player=${encodeURIComponent(p.name)}`;
+			else res.text().then(text => alert('Spieleranalyse fehlgeschlagen: ' + text));
+		});
+	}
+	if (type === 'archive' || type === 'archiveFinished' || type === 'playerAnalysis'){
 		document.getElementById('player-context-menu').style.display = 'none';
 		document.getElementById('game-context-menu').style.display = 'none';
 	}
@@ -573,6 +582,7 @@ window.handleMenuAction = function(type) {
         <li onclick="handleMenuAction('active')">Aktive Spiele laden</li>
         <li onclick="handleMenuAction('history')">History laden</li>
         <li onclick="handleMenuAction('archiveFinished')">Beendete Spiele archivieren</li>
+        <li onclick="handleMenuAction('playerAnalysis')">Spieleranalyse</li>
         <li class="filter-remove" onclick="handleMenuAction('removeFilter')">Aus Filter entfernen</li>
     </div>		
 	</div>
