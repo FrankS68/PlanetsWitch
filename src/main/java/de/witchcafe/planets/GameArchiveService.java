@@ -1,8 +1,6 @@
 package de.witchcafe.planets;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.internal.LinkedTreeMap;
 
 /**
@@ -31,6 +30,7 @@ import com.google.gson.internal.LinkedTreeMap;
 public class GameArchiveService {
 
 	private static final Pattern TURN_FILE = Pattern.compile("player(\\d+)-turn(\\d+)\\.trn");
+	private static final Pattern BROKEN_EMPTY_LIST = Pattern.compile("(\":\\s*)\\]");
 
 	private final GamesService gamesService;
 	private final GamesRepository gamesRepository;
@@ -102,10 +102,16 @@ public class GameArchiveService {
 			entries.sort(Comparator.<ZipEntry>comparingInt(entry -> turnOf(entry))
 					.thenComparingInt(entry -> playerOf(entry)));
 			for (ZipEntry entry : entries) {
-				try (Reader reader = new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8)) {
-					LinkedTreeMap<String, Object> data = gson.fromJson(reader, LinkedTreeMap.class);
-					consumer.accept(new Turn(gameId, playerOf(entry), turnOf(entry), data));
+				String json = new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+				LinkedTreeMap<String, Object> data;
+				try {
+					data = gson.fromJson(json, LinkedTreeMap.class);
 				}
+				catch (JsonSyntaxException exc) {
+					// turn 0 of old games has empty lists written as "scores": ] instead of []
+					data = gson.fromJson(BROKEN_EMPTY_LIST.matcher(json).replaceAll("$1[]"), LinkedTreeMap.class);
+				}
+				consumer.accept(new Turn(gameId, playerOf(entry), turnOf(entry), data));
 			}
 		}
 	}
