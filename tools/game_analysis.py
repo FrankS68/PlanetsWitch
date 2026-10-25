@@ -33,7 +33,12 @@ OPENING_TURNS = (10, 20, 30, 40)
 
 
 def load_turn(archive, slot, turn):
-    data = json.loads(archive.read("player%d-turn%d.trn" % (slot, turn)))
+    raw = archive.read("player%d-turn%d.trn" % (slot, turn))
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        # turn 0 of old games has empty lists written as "scores": ] instead of []
+        data = json.loads(re.sub(rb'(":\s*)\]', rb"\1[]", raw))
     return data.get("rst", data)
 
 
