@@ -68,6 +68,15 @@ public class PlanetsWitchRestAPI {
 		return topOfficerGamesService.loadTopOfficerGames(days);
     }
 
+	@Autowired
+	GameAnalysisService gameAnalysisService;
+
+	/** runs the player analysis (tools/player_analysis.py), shown afterwards at /playeranalysis?player= */
+	@GetMapping("/playeranalysis/{username}")
+    public String runPlayerAnalysis(@PathVariable("username") String username) throws IOException, InterruptedException {
+		return gameAnalysisService.runPlayerAnalysis(username);
+    }
+
 	@GetMapping("/active/{accountId}")
     public String getActivesByUserName(@PathVariable("accountId") String accountId) {
 		gamesService.getActiveGamesByUsername(accountId);
