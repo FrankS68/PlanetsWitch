@@ -20,6 +20,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Menu;
+import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
 import de.witchcafe.base.ui.component.ViewToolbar;
@@ -29,7 +30,8 @@ import de.witchcafe.planets.ui.GraphFilter.Condition;
 import de.witchcafe.planets.ui.GraphFilter.Operator;
 
 @Route("graph")
-@Menu(order = 0, icon = "vaadin:clipboard-check", title = "Graph")
+@PageTitle("Konstellationen")
+@Menu(order = 0, icon = "vaadin:star", title = "Konstellationen")
 @JavaScript("./dist/neovis.js")
 public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
@@ -65,7 +67,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         refreshSavedSearches();
 
         add(new ViewToolbar(
-        		"Advanced neovis example",
+        		"Konstellationen",
         		ViewToolbar.group(
         				new Button("Filter", new Icon(VaadinIcon.FILTER), e -> getFilterDialog().open()),
         				savedSearches)));

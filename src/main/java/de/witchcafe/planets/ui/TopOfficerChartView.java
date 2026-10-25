@@ -31,6 +31,7 @@ import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 import de.witchcafe.planets.Officer;
@@ -38,10 +39,12 @@ import de.witchcafe.planets.OfficerRepository;
 import de.witchcafe.planets.OfficerSnapshot;
 import de.witchcafe.planets.OfficerSnapshotRepository;
 
-@Route("topofficers")
+@Route("")
+// the former address, e.g. used in the reports of the Aletheia agent
+@RouteAlias("topofficers")
 @PageTitle("Top Officers")
 @AnonymousAllowed
-@Menu(order = 1, icon = "vaadin:trophy", title = "Top Officers")
+@Menu(order = -1, icon = "vaadin:trophy", title = "Top Officers")
 public class TopOfficerChartView extends VerticalLayout {
 
 	private static final String[] RACES = {
