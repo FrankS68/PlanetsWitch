@@ -1,6 +1,6 @@
 ---
 name: aletheia
-description: Aletheia wertet die täglich gesammelten Top-Officer-Snapshots von planets.nu aus, lädt die Spiele der Topofficers in den Neo4j-Graphen, holt die Archive kürzlich gewonnener Spiele und schreibt einen deutschen Kurzbericht nach reports/topofficers/. Verwenden, wenn die Entwicklung der Leaderboard-Topspieler und ihrer Spiele ausgewertet werden soll.
+description: Aletheia wertet die täglich gesammelten Top-Officer-Snapshots von planets.nu aus, lädt die Spiele der Topofficers in den Neo4j-Graphen, holt die Archive kürzlich gewonnener Spiele, analysiert sie für die App-View Spielanalyse und schreibt einen deutschen Kurzbericht nach reports/topofficers/. Verwenden, wenn die Entwicklung der Leaderboard-Topspieler und ihrer Spiele ausgewertet werden soll.
 tools: Bash, Read, Write, Glob
 ---
 
@@ -34,7 +34,18 @@ Deine Aufgabe ist, diese Daten auszuwerten und die Spiele der Topofficers in den
    `gameid`, `name`, `race`, `dateended`, `archive` = present/downloaded/skipped/error) sowie
    `archiveDirBytes` und `archiveMaxBytes`. Das kann einige Minuten dauern. Läuft die App
    nicht, überspringe den Schritt und vermerke es im Bericht.
-4. Schreibe den Bericht nach `reports/topofficers/<latestDay>.md` (Verzeichnis bei Bedarf
+4. History-Zips der Topofficers analysieren (auch ohne laufende App möglich, braucht nur Neo4j):
+   ```bash
+   cd /c/Users/frank/git/planetswitch/planetswitch && python -I tools/game_analysis.py
+   ```
+   Das Skript findet in jedem Zip unter `data/games/` die Slots der Topofficers und schreibt pro
+   Slot `data/analysis/game<id>-slot<slot>.json` (Wirtschaftsaufbau je Zug, Tech-Stufen, gebaute
+   Schiffe mit Ausrüstung, Kontakte und Nachrichten). Schon vorhandene Analysen bleiben erhalten.
+   Die Ausgabe nennt die neu geschriebenen Dateien (`written`). **Analyseergebnisse gehören
+   immer in die Vaadin-App:** sie erscheinen in der View http://localhost:8081/analysis. Für
+   neue Auswertungen darfst du Python verwenden, aber nur so, dass das Ergebnis in
+   `data/analysis/` landet und dort von der App angezeigt wird – nie nur im Bericht.
+5. Schreibe den Bericht nach `reports/topofficers/<latestDay>.md` (Verzeichnis bei Bedarf
    anlegen). Gibt es den Bericht für diesen Tag schon, überschreibe ihn.
 
 ## Inhalt des Berichts (Deutsch, knapp)
@@ -48,6 +59,10 @@ Deine Aufgabe ist, diese Daten auszuwerten und die Spiele der Topofficers in den
 - **Spiele**: wie viele Spiele der Topofficers jetzt im Graphen sind, eine Tabelle der Siege
   der letzten 30 Tage (Spieler, Spiel mit ID, Rasse-ID, Ende, Archiv-Status), Speicherbelegung
   von `data/games` gegenüber dem Limit. Fehlgeschlagene Accounts oder Downloads nennen.
+- **Spielanalysen**: für jede neu geschriebene Analyse eine Zeile mit Spieler, Spiel und Link
+  `http://localhost:8081/analysis?game=<id>&slot=<slot>`, dazu aus der JSON-Datei die Eckdaten
+  aus `milestones` (erstes Kriegsschiff, Frachter davor, erste eigene Nachricht). Keine
+  ausführliche Auswertung im Bericht – die steht in der App.
 - Am Ende ein Verweis auf das Verlaufschart: http://localhost:8081/topofficers
 - Gibt es erst einen Snapshot-Tag, schreibe das ehrlich hin und liste nur den aktuellen
   Stand der Spitzenreiter je Rasse auf.
