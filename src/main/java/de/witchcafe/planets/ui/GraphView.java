@@ -1,5 +1,8 @@
 package de.witchcafe.planets.ui;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Value;
 
 import com.google.gson.Gson;
@@ -78,12 +81,29 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
     /** replaces the shown graph */
     private void renderCypher(String cypher) {
+        pushFilterEntries();
         UI.getCurrent().getPage().executeJs("window.updateWithCypher($0);", cypher);
     }
 
     private void renderFilter() {
-        getFilterDialog().refresh();
+        getFilterDialog().useTree();
         renderCypher(filter.toCypher());
+    }
+
+    /** the context menu offers "remove from filter" for nodes matching one of these entries */
+    private void pushFilterEntries() {
+        List<Map<String, Object>> entries = filter.alternatives().stream()
+        		.map(c -> Map.<String, Object>of("label", c.getLabel(), "property", c.getProperty(), "values", c.values()))
+        		.toList();
+        getElement().executeJs("window.filterEntries = JSON.parse($0);", new Gson().toJson(entries));
+    }
+
+    /** Called from the context menu: removes the node from the filter and reloads the graph. */
+    @ClientCallable
+    public void removeFromFilter(String label, String property, String value) {
+        if (filter.removeValue(label, property, value)) {
+            renderFilter();
+        }
     }
 
     private GraphFilterDialog getFilterDialog() {
@@ -101,6 +121,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
     public void addToFilter(String label, String property, String value) {
         Condition condition = filter.addAlternative(new Condition(label, property, Operator.EQUALS, value));
         getFilterDialog().refresh();
+        pushFilterEntries();
         getElement().executeJs("window.visualisation.getVisualisation().updateWithCypher($0);", GraphFilter.toCypher(condition));
     }
 
@@ -207,6 +228,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         getElement().executeJs(script);
         // the context menu reports loaded data back to this view
         getElement().executeJs("window.graphView = this;");
+        pushFilterEntries();
         getElement().executeJs(createSetup());
         getElement().executeJs("drawembedded()");
         getElement().executeJs("setupContextMenu()");
@@ -279,8 +301,11 @@ window.drawembedded = function() {
 						type: 'Game',
 						shape: 'dot',
 						size: 25,
-						color: { background: '#7ce92b' },
 						font: { size: 14, color: '#000000', background: '#ffffff' }
+					},
+					function: {
+						// finished games yellow, all others green
+						color: (node) => ({ background: node.properties.statusname === 'Finished' ? '#ffd700' : '#7ce92b' })
 					}
 				}
 			},
@@ -347,6 +372,8 @@ window.setupContextMenu = function() {
 		        if (nodeId) {
 		            console.log("Knoten gefunden!", nodeId);
 		            selectedNodeData = viz.nodes.get(nodeId);
+		            const inFilter = findFilterEntry(selectedNodeData) !== undefined;
+		            document.querySelectorAll('.filter-remove').forEach(li => li.style.display = inFilter ? '' : 'none');
 		        	if (selectedNodeData.type == 'Player'){
 						console.log("Player Knoten gefunden!", nodeId);
 						gameMenu.style.display = 'none';
@@ -392,10 +419,24 @@ window.loadAndAdd = function(url, label, property, value) {
 	});
 }
 
+// the filter entry (label, property, values) that brings this node into the graph, if any
+window.findFilterEntry = function(node) {
+	const labels = node.raw.labels;
+	const props = node.raw.properties;
+	return (window.filterEntries || []).find(e =>
+		labels.includes(e.label) && props[e.property] != null && e.values.includes(String(props[e.property])));
+}
+
 window.handleMenuAction = function(type) {
 	var reset = false;
 	if (!selectedNodeData) return;
 	const p = selectedNodeData.raw.properties;
+
+	if (type === 'removeFilter'){
+		const entry = findFilterEntry(selectedNodeData);
+		if (entry) window.graphView.$server.removeFromFilter(entry.label, entry.property, String(p[entry.property]));
+		reset = true;
+	}
 
 	if (type === 'players'){
 		loadAndAdd(`/api/gameinfos/${p.gameId}`, 'Game', 'gameId', p.gameId);
@@ -523,11 +564,13 @@ window.handleMenuAction = function(type) {
         <li onclick="handleMenuAction('scores')">🌐 Scores öffnen</li>
         <li onclick="handleMenuAction('details')">📋 Details anzeigen</li>
         <li onclick="handleMenuAction('archive')">Archiv laden</li>
+        <li class="filter-remove" onclick="handleMenuAction('removeFilter')">Aus Filter entfernen</li>
     </div>
     <div id="player-context-menu">
         <li onclick="handleMenuAction('active')">Aktive Spiele laden</li>
         <li onclick="handleMenuAction('history')">History laden</li>
         <li onclick="handleMenuAction('archiveFinished')">Beendete Spiele archivieren</li>
+        <li class="filter-remove" onclick="handleMenuAction('removeFilter')">Aus Filter entfernen</li>
     </div>		
 	</div>
     """;

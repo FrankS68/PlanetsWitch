@@ -140,6 +140,22 @@ public class GraphFilter {
 			return new Condition();
 		}
 
+		/** true when the condition selects start nodes by a list of property values, e.g. one game or some players */
+		boolean selectsValues() {
+			return target == Target.START && !isBlank(label) && !isBlank(property)
+					&& (operator == Operator.EQUALS || operator == Operator.IN);
+		}
+
+		public List<String> values() {
+			if (operator != Operator.IN) {
+				return List.of(value == null ? "" : value);
+			}
+			return Arrays.stream((value == null ? "" : value).split(","))
+					.map(String::trim)
+					.filter(v -> !v.isEmpty())
+					.toList();
+		}
+
 		@Override
 		String toCypher() {
 			String variable = target.variable;
@@ -158,9 +174,7 @@ public class GraphFilter {
 
 		private String literal() {
 			if (operator == Operator.IN) {
-				return Arrays.stream((value == null ? "" : value).split(","))
-						.map(String::trim)
-						.filter(v -> !v.isEmpty())
+				return values().stream()
 						.map(GraphFilter::quote)
 						.collect(Collectors.joining(", ", "[", "]"));
 			}
@@ -245,6 +259,50 @@ public class GraphFilter {
 			root.add(old);
 		}
 		return root.add(condition);
+	}
+
+	/**
+	 * Conditions of OR groups that select nodes by value. Each of them adds its nodes to the graph,
+	 * so a node matched by one of them can be removed from the filter again.
+	 */
+	public List<Condition> alternatives() {
+		List<Condition> result = new ArrayList<>();
+		collectAlternatives(root, result);
+		return result;
+	}
+
+	private static void collectAlternatives(Group group, List<Condition> result) {
+		for (Node child : group.children) {
+			if (child instanceof Group childGroup) {
+				collectAlternatives(childGroup, result);
+			} else if (group.junction == Junction.OR && child instanceof Condition condition && condition.selectsValues()) {
+				result.add(condition);
+			}
+		}
+	}
+
+	/**
+	 * Removes the node with this property value from all alternatives: from an IN list only the value,
+	 * otherwise the whole condition.
+	 *
+	 * @return whether the filter was changed
+	 */
+	public boolean removeValue(String label, String property, String value) {
+		boolean changed = false;
+		for (Condition condition : alternatives()) {
+			List<String> values = condition.values();
+			if (!label.equals(condition.label) || !property.equals(condition.property) || !values.contains(value)) {
+				continue;
+			}
+			List<String> remaining = values.stream().filter(v -> !v.equals(value)).toList();
+			if (remaining.isEmpty()) {
+				condition.parent.remove(condition);
+			} else {
+				condition.value = String.join(", ", remaining);
+			}
+			changed = true;
+		}
+		return changed;
 	}
 
 	public String toCypher() {

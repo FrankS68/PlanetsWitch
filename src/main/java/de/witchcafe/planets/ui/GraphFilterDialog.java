@@ -91,10 +91,7 @@ public class GraphFilterDialog extends Dialog {
 		content.setPadding(false);
 		add(content);
 
-		Button regenerate = new Button("Aus Baum erzeugen", e -> {
-			custom = false;
-			refresh();
-		});
+		Button regenerate = new Button("Aus Baum erzeugen", e -> useTree());
 		Button apply = new Button("Anwenden", e -> applyCypher.accept(cypherArea.getValue()));
 		apply.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 		getFooter().add(regenerate, new Button("Schließen", e -> close()), apply);
@@ -111,6 +108,12 @@ public class GraphFilterDialog extends Dialog {
 			tree.select(selected);
 		}
 		updateCypher();
+	}
+
+	/** Makes the tree the source of the query again, e.g. after the filter was changed from the graph. */
+	public void useTree() {
+		custom = false;
+		refresh();
 	}
 
 	/** Shows a query that was not built from the tree. */
