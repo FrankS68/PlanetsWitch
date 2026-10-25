@@ -5,6 +5,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 /**
  * Filter of the graph view as AND/OR tree. Every condition is evaluated on the start node n
  * or on its neighbour m of the pattern (n)-[r]-(m), so a match always brings its connections along.
@@ -307,6 +311,50 @@ public class GraphFilter {
 
 	public String toCypher() {
 		return toCypher(root);
+	}
+
+	/** the tree as JSON, to store it as saved search */
+	public String toJson() {
+		return toJsonObject(root).toString();
+	}
+
+	/** replaces the tree with the one stored by {@link #toJson()} */
+	public void fromJson(String json) {
+		Node node = fromJsonObject(JsonParser.parseString(json).getAsJsonObject());
+		root = node instanceof Group group ? group : new Group(Junction.OR, node);
+	}
+
+	private static JsonObject toJsonObject(Node node) {
+		JsonObject json = new JsonObject();
+		if (node instanceof Group group) {
+			json.addProperty("junction", group.junction.name());
+			JsonArray children = new JsonArray();
+			group.children.forEach(child -> children.add(toJsonObject(child)));
+			json.add("children", children);
+		} else if (node instanceof Condition condition) {
+			json.addProperty("target", condition.target.name());
+			json.addProperty("label", condition.label);
+			json.addProperty("property", condition.property);
+			json.addProperty("operator", condition.operator.name());
+			json.addProperty("value", condition.value);
+		}
+		return json;
+	}
+
+	private static Node fromJsonObject(JsonObject json) {
+		if (json.has("junction")) {
+			Group group = new Group(Junction.valueOf(json.get("junction").getAsString()));
+			json.getAsJsonArray("children").forEach(child -> group.add(fromJsonObject(child.getAsJsonObject())));
+			return group;
+		}
+		Condition condition = new Condition(string(json, "label"), string(json, "property"),
+				Operator.valueOf(json.get("operator").getAsString()), string(json, "value"));
+		condition.target = Target.valueOf(json.get("target").getAsString());
+		return condition;
+	}
+
+	private static String string(JsonObject json, String key) {
+		return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : null;
 	}
 
 	public static String toCypher(Node node) {

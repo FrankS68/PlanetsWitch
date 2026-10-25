@@ -11,6 +11,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -20,6 +21,8 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.treegrid.TreeGrid;
 import com.vaadin.flow.data.value.ValueChangeMode;
 
+import de.witchcafe.planets.SavedSearch;
+import de.witchcafe.planets.SavedSearchService;
 import de.witchcafe.planets.ui.GraphFilter.Condition;
 import de.witchcafe.planets.ui.GraphFilter.Group;
 import de.witchcafe.planets.ui.GraphFilter.Junction;
@@ -46,11 +49,19 @@ public class GraphFilterDialog extends Dialog {
 	private final TextArea cypherArea = new TextArea("Cypher");
 	private final Span customHint = new Span("Von Hand geändert – folgt nicht mehr dem Baum");
 	private final Button deleteButton = new Button("Löschen");
+	private final TextField searchName = new TextField();
+	private final Button saveSearch = new Button("Speichern", e -> saveSearch());
+	private final Button deleteSearch = new Button("Suche löschen", e -> deleteSearch());
+	private final SavedSearchService savedSearchService;
+	private final Runnable savedSearchesChanged;
 	private boolean custom;
 
-	public GraphFilterDialog(GraphFilter filter, Consumer<String> applyCypher) {
+	public GraphFilterDialog(GraphFilter filter, Consumer<String> applyCypher,
+			SavedSearchService savedSearchService, Runnable savedSearchesChanged) {
 		this.filter = filter;
 		this.applyCypher = applyCypher;
+		this.savedSearchService = savedSearchService;
+		this.savedSearchesChanged = savedSearchesChanged;
 		setHeaderTitle("Filter");
 		setWidth("1100px");
 		setDraggable(true);
@@ -87,7 +98,15 @@ public class GraphFilterDialog extends Dialog {
 		customHint.getStyle().set("color", "var(--lumo-error-text-color)");
 		customHint.setVisible(false);
 
-		VerticalLayout content = new VerticalLayout(top, cypherArea, customHint);
+		searchName.setPlaceholder("Name der Suche");
+		searchName.setValueChangeMode(ValueChangeMode.EAGER);
+		deleteSearch.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+		updateSearchButtons();
+		searchName.addValueChangeListener(e -> updateSearchButtons());
+		HorizontalLayout saveRow = new HorizontalLayout(searchName, saveSearch, deleteSearch);
+		saveRow.setAlignItems(FlexComponent.Alignment.BASELINE);
+
+		VerticalLayout content = new VerticalLayout(saveRow, top, cypherArea, customHint);
 		content.setPadding(false);
 		add(content);
 
@@ -108,6 +127,38 @@ public class GraphFilterDialog extends Dialog {
 			tree.select(selected);
 		}
 		updateCypher();
+	}
+
+	/** the name the current filter is saved under (the loaded saved search) */
+	public void setSearchName(String name) {
+		searchName.setValue(name == null ? "" : name);
+	}
+
+	private void saveSearch() {
+		String name = searchName.getValue().trim();
+		savedSearchService.save(name, filter.toJson(), custom ? cypherArea.getValue() : null);
+		Notification.show("Suche „" + name + "“ gespeichert");
+		searchName.setValue(name);
+		updateSearchButtons();
+		savedSearchesChanged.run();
+	}
+
+	/** delete is only possible for a name that is saved */
+	private void updateSearchButtons() {
+		String name = searchName.getValue().trim();
+		saveSearch.setEnabled(!name.isEmpty());
+		deleteSearch.setEnabled(!name.isEmpty() && savedSearchService.findByName(name) != null);
+	}
+
+	private void deleteSearch() {
+		String name = searchName.getValue().trim();
+		SavedSearch search = savedSearchService.findByName(name);
+		if (search != null) {
+			savedSearchService.delete(search);
+			Notification.show("Suche „" + name + "“ gelöscht");
+			searchName.clear();
+			savedSearchesChanged.run();
+		}
 	}
 
 	/** Makes the tree the source of the query again, e.g. after the filter was changed from the graph. */

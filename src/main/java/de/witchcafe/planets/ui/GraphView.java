@@ -11,20 +11,20 @@ import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dependency.JavaScript;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.Route;
 
 import de.witchcafe.base.ui.component.ViewToolbar;
+import de.witchcafe.planets.SavedSearch;
+import de.witchcafe.planets.SavedSearchService;
 import de.witchcafe.planets.ui.GraphFilter.Condition;
 import de.witchcafe.planets.ui.GraphFilter.Operator;
 
@@ -35,35 +35,40 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
 	private final GraphFilter filter = new GraphFilter(Condition.all());
 	private GraphFilterDialog filterDialog;
+	private final ComboBox<SavedSearch> savedSearches = new ComboBox<>();
 
-	TextField searchField;
-	NativeButton searchButton;
-	TextField scriptField;
-	NativeButton scriptButton;
+	private final SavedSearchService savedSearchService;
 	private final String neo4jUri;
 	private final String neo4jUser;
 	private final String neo4jPassword;
 
     public GraphView(
+    		SavedSearchService savedSearchService,
     		@Value("${spring.neo4j.uri}") String neo4jUri,
     		@Value("${spring.neo4j.authentication.username}") String neo4jUser,
     		@Value("${spring.neo4j.authentication.password:}") String neo4jPassword) {
+        this.savedSearchService = savedSearchService;
         this.neo4jUri = neo4jUri;
         this.neo4jUser = neo4jUser;
         this.neo4jPassword = neo4jPassword;
         setSizeFull();
         setPadding(false);
+
+        savedSearches.setPlaceholder("Gespeicherte Suche ...");
+        savedSearches.setItemLabelGenerator(SavedSearch::getName);
+        savedSearches.setClearButtonVisible(true);
+        savedSearches.addValueChangeListener(e -> {
+        	if (e.isFromClient() && e.getValue() != null) {
+        		loadSearch(e.getValue());
+        	}
+        });
+        refreshSavedSearches();
+
         add(new ViewToolbar(
-        		"Advanced neovis example", 
+        		"Advanced neovis example",
         		ViewToolbar.group(
         				new Button("Filter", new Icon(VaadinIcon.FILTER), e -> getFilterDialog().open()),
-        				getSearchField(),
-        				getSearchButton(),
-        				getSearchMeButton(),
-        				getSearchUnconnectedButton(),
-        				getJSButton("console.log(window);"), 
-        				getScriptField(), 
-        				getScriptButton())));
+        				savedSearches)));
 
         Div viz = new Div();
         viz.setId("viz");
@@ -74,9 +79,27 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         add(new Html(createContextMenuDiv()));
     }
     
-    public void filterGraph(String searchString) {
-        getFilterDialog().setCustomCypher(searchString);
-        renderCypher(searchString);
+    /** shows a saved search: its tree, or its hand edited query */
+    private void loadSearch(SavedSearch search) {
+        filter.fromJson(search.getFilterJson());
+        GraphFilterDialog dialog = getFilterDialog();
+        dialog.setSearchName(search.getName());
+        if (search.getCypher() != null) {
+            dialog.refresh();
+            dialog.setCustomCypher(search.getCypher());
+            renderCypher(search.getCypher());
+        } else {
+            renderFilter();
+        }
+    }
+
+    private void refreshSavedSearches() {
+        SavedSearch selected = savedSearches.getValue();
+        List<SavedSearch> all = savedSearchService.findAll();
+        savedSearches.setItems(all);
+        // reselect by name, the saved entities are new instances
+        savedSearches.setValue(selected == null ? null
+        		: all.stream().filter(s -> s.getName().equals(selected.getName())).findFirst().orElse(null));
     }
 
     /** replaces the shown graph */
@@ -108,7 +131,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
     private GraphFilterDialog getFilterDialog() {
         if (filterDialog == null) {
-            filterDialog = new GraphFilterDialog(filter, this::renderCypher);
+            filterDialog = new GraphFilterDialog(filter, this::renderCypher, savedSearchService, this::refreshSavedSearches);
         }
         return filterDialog;
     }
@@ -125,83 +148,6 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         getElement().executeJs("window.visualisation.getVisualisation().updateWithCypher($0);", GraphFilter.toCypher(condition));
     }
 
-	private TextField getSearchField() {
-		// Das Suchfeld erstellen
-		searchField = new TextField();
-		searchField.setPlaceholder("Suche eingeben ...");
-		searchField.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
-		searchField.setClearButtonVisible(true); // Erlaubt schnelles Löschen der Suche
-		searchField.setValueChangeMode(ValueChangeMode.EAGER); // Filtert sofort beim Tippen
-
-		// Die Filter-Logik
-		searchField.addValueChangeListener(event -> {
-		    Boolean enabled = searchField.getValue().trim().length() > 0;
-		    searchButton.setEnabled(enabled);
-		});
-		return searchField;
-	}
-
-	private NativeButton getSearchButton() {
-		searchButton = new NativeButton(
-		        "Search");
-		searchButton.addClickListener(e -> filterGraph(searchField.getValue().toLowerCase()));
-		searchButton.setEnabled(false);
-		return searchButton;
-	}
-
-	private TextField getScriptField() {
-		// Das Suchfeld erstellen
-		scriptField = new TextField();
-		scriptField.setPlaceholder("script eingeben ...");
-		scriptField.setPrefixComponent(new Icon(VaadinIcon.ROAD));
-		scriptField.setClearButtonVisible(true); // Erlaubt schnelles Löschen der Suche
-		scriptField.setValueChangeMode(ValueChangeMode.EAGER); // Filtert sofort beim Tippen
-
-		// Die Filter-Logik
-		scriptField.addValueChangeListener(event -> {
-		    Boolean enabled = scriptField.getValue().trim().length() > 0;
-		    scriptButton.setEnabled(enabled);
-		});
-		return scriptField;
-	}
-
-	private NativeButton getScriptButton() {
-		scriptButton = new NativeButton(
-		        "run script");
-		scriptButton.addClickListener(e -> {
-			// getElement().executeJs(scriptField.getValue().toLowerCase());
-			UI.getCurrent().getPage().executeJs(scriptField.getValue().toLowerCase());
-		});
-		scriptButton.setEnabled(false);
-		return scriptButton;
-	}
-
-	private NativeButton getJSButton(String expression) {
-		NativeButton button = new NativeButton(
-		        "javascript:"+expression);
-		button.addClickListener(e -> getElement().executeJs(expression));
-		return button;
-	}
-	
-	private NativeButton getSearchMeButton() {
-		NativeButton button = new NativeButton(
-		        "SearchMe");
-		button.addClickListener(e -> {
-			filter.reset(new Condition("Player", "name", Operator.IN, "lomize, hawkeye418, gráinne, moulliez d"));
-			renderFilter();
-		});
-		return button;
-	} // 
-	
-	private NativeButton getSearchUnconnectedButton() {
-		NativeButton button = new NativeButton(
-		        "Unconnected");
-		button.addClickListener(e -> filterGraph("MATCH (g:Game) WHERE NOT (g)<-[:playedIn]-() RETURN g"));
-		return button;
-	} // 
-	/*
-
-	 */
 
     /**
      * graph?player=<accountid> starts with that player and everything connected to it

@@ -62,6 +62,22 @@ class GraphFilterTests {
 	}
 
 	@Test
+	void testJsonRoundTrip() {
+		GraphFilter filter = new GraphFilter(new Condition("Game", "gameId", Operator.EQUALS, "664877"));
+		Group group = filter.getRoot().add(new Group(Junction.AND));
+		group.add(new Condition("Player", "name", Operator.IN, "lomize, o'neil"));
+		Condition all = group.add(Condition.all());
+		all.setTarget(Target.NEIGHBOUR);
+
+		GraphFilter copy = new GraphFilter(Condition.all());
+		copy.fromJson(filter.toJson());
+
+		assertEquals(filter.toCypher(), copy.toCypher());
+		assertEquals(filter.toJson(), copy.toJson());
+		assertSame(copy.getRoot(), copy.getRoot().getChildren().get(1).getParent());
+	}
+
+	@Test
 	void testEmptyGroupsAndIdentifiers() {
 		assertEquals("false", new Group(Junction.OR).toCypher());
 		assertEquals("true", new Group(Junction.AND).toCypher());
