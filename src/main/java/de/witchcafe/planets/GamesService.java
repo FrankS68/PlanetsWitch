@@ -322,7 +322,7 @@ public class GamesService {
 
 					Game foundGame = gamesRepository.findByGameId(gameId);
 					String raceId = playerData.get("raceid").toString();
-					foundPlayer.addPlayerIn(foundGame, null, null, raceId);
+					foundPlayer.linkGame(foundGame, raceId);
 					playerRepository.save(foundPlayer);
 				}
 			});

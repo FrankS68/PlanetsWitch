@@ -219,6 +219,9 @@ window.updateWithCypher = function(cypher) {
     checkAndLoad();
 }
 
+const RACE_NAMES = ['', 'Fed', 'Lizard', 'Birds', 'Fascist', 'Privateer', 'Cyborg', 'Crystal',
+	'Empire', 'Robots', 'Rebel', 'Colonies', 'Horwasp'];
+
 window.drawembedded = function() {
 	var config = {
 		containerId: 'viz',
@@ -265,6 +268,37 @@ window.drawembedded = function() {
 						size: 25,
 						color: { background: '#ff002b' },
 						font: { size: 14, color: '#000080', background: '#ffffff' }
+					}
+				}
+			},
+			Officer: {
+				label: 'username',
+				[NeoVis.NEOVIS_ADVANCED_CONFIG]: {
+					static: {
+						type: 'Officer',
+						shape: 'triangle',
+						size: 12,
+						color: { background: '#b388ff', border: '#6a1b9a' },
+						font: { size: 10, color: '#000000', background: '#ffffff' }
+					},
+					function: {
+						// race and rank in the top officer list, e.g. "Cyborg #3"
+						label: (node) => RACE_NAMES[Number(node.properties.raceid)] + ' #' + node.properties.rank,
+						title: (node) => node.properties.username + ': ' + node.properties.levelname + ', Rating ' + node.properties.rating
+					}
+				}
+			},
+			OfficerSnapshot: {
+				[NeoVis.NEOVIS_ADVANCED_CONFIG]: {
+					static: {
+						type: 'OfficerSnapshot',
+						shape: 'dot',
+						size: 4,
+						color: { background: '#9e9e9e', border: '#757575' },
+						font: { size: 8, color: '#9e9e9e' }
+					},
+					function: {
+						label: (node) => String(node.properties.day)
 					}
 				}
 			}
