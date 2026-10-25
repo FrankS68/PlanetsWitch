@@ -221,6 +221,25 @@ window.updateWithCypher = function(cypher) {
     checkAndLoad();
 }
 
+// neovis numbers the edges by their count instead of using the relationship id, so a relationship
+// loaded again (additive loads from the context menu) becomes a second edge. These duplicates are
+// hidden; removing them would lower the count and the next new edge would overwrite an existing one.
+window.hideDuplicateEdges = function(viz) {
+	const seen = new Set();
+	const duplicates = [];
+	viz.edges.get().forEach(edge => {
+		const key = edge.from + '-' + edge.raw.type + '-' + edge.to;
+		if (!seen.has(key)) {
+			seen.add(key);
+		} else if (!edge.hidden) {
+			duplicates.push({ id: edge.id, hidden: true });
+		}
+	});
+	if (duplicates.length > 0) {
+		viz.edges.update(duplicates);
+	}
+}
+
 const RACE_NAMES = ['', 'Fed', 'Lizard', 'Birds', 'Fascist', 'Privateer', 'Cyborg', 'Crystal',
 	'Empire', 'Robots', 'Rebel', 'Colonies', 'Horwasp'];
 
@@ -321,7 +340,9 @@ window.drawembedded = function() {
 	console.log('here the magic breaks');
 	debugger;
 	window.visualisation.setVisualisation(new NeoVis.default(config));
-	window.visualisation.getVisualisation().render();
+	const viz = window.visualisation.getVisualisation();
+	viz.registerOnEvent('completed', () => hideDuplicateEdges(viz));
+	viz.render();
 	console.log(window.visualisation.getVisualisation());
 
 }
