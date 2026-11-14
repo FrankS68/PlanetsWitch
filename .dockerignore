@@ -1,0 +1,13 @@
+target/
+node_modules/
+data/
+reports/
+.vaadin/
+.eclipse/
+.claude/
+.git/
+**/__pycache__/
+planets-credentials.properties
+.env
+result.json
+queries.cypher

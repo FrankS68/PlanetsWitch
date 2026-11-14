@@ -5,13 +5,17 @@ rank and rating changes against the previous snapshot day and the day about a
 week before, plus new entries and drop-outs.
 
 Usage: python -I tools/topofficer_changes.py [path/to/planets-credentials.properties]
+Set NEO4J_HTTP (e.g. http://spiekeroog.fritz.box:7474) to use a Neo4j on another host.
 """
 import base64
 import json
+import os
 import sys
 import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
+
+NEO4J_HTTP = os.environ.get("NEO4J_HTTP", "http://localhost:7474").rstrip("/")
 
 RACES = ["", "Solar Federation", "Lizard Alliance", "Empire of the Birds", "Hordes of Fury",
          "Privateer Bands", "Cyborg", "Crystal Confederation", "Evil Empire",
@@ -19,6 +23,8 @@ RACES = ["", "Solar Federation", "Lizard Alliance", "Empire of the Birds", "Hord
 
 
 def neo4j_password(properties_file):
+    if os.environ.get("NEO4J_PASSWORD"):
+        return os.environ["NEO4J_PASSWORD"]
     for line in Path(properties_file).read_text(encoding="utf-8").splitlines():
         if line.startswith("spring.neo4j.authentication.password="):
             return line.split("=", 1)[1].strip()
@@ -27,7 +33,7 @@ def neo4j_password(properties_file):
 
 def query(password, statement, **parameters):
     body = json.dumps({"statements": [{"statement": statement, "parameters": parameters}]}).encode()
-    request = urllib.request.Request("http://localhost:7474/db/neo4j/tx/commit", data=body, headers={
+    request = urllib.request.Request(NEO4J_HTTP + "/db/neo4j/tx/commit", data=body, headers={
         "Content-Type": "application/json",
         "Authorization": "Basic " + base64.b64encode(("neo4j:" + password).encode()).decode()})
     result = json.load(urllib.request.urlopen(request, timeout=30))

@@ -46,7 +46,8 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
     public GraphView(
     		SavedSearchService savedSearchService,
-    		@Value("${spring.neo4j.uri}") String neo4jUri,
+    		// the browser connects itself, so in docker it needs the host's address, not the service name
+    		@Value("${planetswitch.graph.neo4j-uri:${spring.neo4j.uri}}") String neo4jUri,
     		@Value("${spring.neo4j.authentication.username}") String neo4jUser,
     		@Value("${spring.neo4j.authentication.password:}") String neo4jPassword) {
         this.savedSearchService = savedSearchService;
