@@ -34,11 +34,14 @@ OPENING_TURNS = (10, 20, 30, 40)
 
 def load_turn(archive, slot, turn):
     raw = archive.read("player%d-turn%d.trn" % (slot, turn))
+    text = raw.decode("utf-8")
     try:
-        data = json.loads(raw)
+        data = json.loads(text)
     except ValueError:
-        # turn 0 of old games has empty lists written as "scores": ] instead of []
-        data = json.loads(re.sub(rb'(":\s*)\]', rb"\1[]", raw))
+        # turn 0 of old games has empty lists written as "scores": ] instead of [];
+        # some turn files contain a second JSON object right after the first: keep the first
+        text = re.sub(r'(":\s*)\]', r"\1[]", text)
+        data = json.JSONDecoder().raw_decode(text)[0]
     return data.get("rst", data)
 
 
