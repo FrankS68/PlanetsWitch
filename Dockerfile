@@ -1,30 +1,22 @@
-FROM ghcr.io/jqlang/jq:latest AS jq-stage
+# Multi-arch (amd64 + arm64, e.g. Raspberry Pi): all base images are official multi-arch images.
+# Used by docker-compose.yml; build alone with: docker build -t planetswitch .
 
 FROM eclipse-temurin:21-jdk AS build
-COPY --from=jq-stage /jq /usr/bin/jq
-# Test that jq works after copying
-RUN jq --version
-
-ENV HOME=/app
-RUN mkdir -p $HOME
-WORKDIR $HOME
-COPY . $HOME
-
-# If you have a Vaadin Pro key, pass it as a secret with id "proKey":
-#
-#   $ docker build --secret id=proKey,src=$HOME/.vaadin/proKey .
-#
-# If you have a Vaadin Offline key, pass it as a secret with id "offlineKey":
-#
-#   $ docker build --secret id=offlineKey,src=$HOME/.vaadin/offlineKey .
-
+WORKDIR /build
+COPY . .
 RUN --mount=type=cache,target=/root/.m2 \
-    --mount=type=secret,id=proKey \
-    --mount=type=secret,id=offlineKey \
-    sh -c 'PRO_KEY=$(jq -r ".proKey // empty" /run/secrets/proKey 2>/dev/null || echo "") && \
-    OFFLINE_KEY=$(cat /run/secrets/offlineKey 2>/dev/null || echo "") && \
-    ./mvnw clean package -Pproduction -DskipTests -Dvaadin.proKey=${PRO_KEY} -Dvaadin.offlineKey=${OFFLINE_KEY}'
+    --mount=type=cache,target=/root/.vaadin \
+    ./mvnw -B clean package -Pproduction -DskipTests
 
-FROM eclipse-temurin:21-jre-alpine
-COPY --from=build /app/target/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "/app.jar", "--spring.profiles.active=prod"]
+FROM eclipse-temurin:21-jre
+# python3 runs tools/*.py (player analysis from the graph context menu); they only use the stdlib
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /build/target/*.jar app.jar
+COPY tools/*.py tools/
+# data/ (archives, analyses) and planets-credentials.properties are mounted by docker-compose.yml
+VOLUME /app/data
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "/app/app.jar", "--spring.profiles.active=prod"]

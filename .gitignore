@@ -21,3 +21,7 @@ vite.generated.ts
 
 # python caches of tools/
 __pycache__/
+
+# docker-compose.yml secrets and neo4j dumps
+.env
+/backup/

@@ -1,0 +1,58 @@
+# planetswitch with its own Neo4j, e.g. on the Raspberry Pi "spiekeroog".
+#
+#   cp .env.example .env              # set NEO4J_PASSWORD and PUBLIC_HOST
+#   cp planets-credentials.properties.example planets-credentials.properties   # planets.nu login
+#   docker compose up -d --build
+#
+# App: http://<PUBLIC_HOST>:${APP_PORT}   Neo4j browser: http://<PUBLIC_HOST>:${NEO4J_HTTP_PORT}
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 1G
+    ports:
+      # published because the graph view (neovis) connects from the browser,
+      # and Aletheia reads it via HTTP
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j-data:/data
+      - ./backup:/backups
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/7687"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build: .
+    image: planetswitch:latest
+    restart: unless-stopped
+    # same uid as the owner of ./data, so files the app writes stay editable on the host
+    user: "${APP_UID:-1001}:${APP_GID:-1001}"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      TZ: Europe/Berlin
+      JAVA_TOOL_OPTIONS: -Xmx1g
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD}
+      PLANETSWITCH_GRAPH_NEO4J_URI: bolt://${PUBLIC_HOST:?set PUBLIC_HOST in .env}:${NEO4J_BOLT_PORT:-7687}
+      # for tools/*.py run inside the container (docker compose exec app python3 -I tools/...)
+      NEO4J_HTTP: http://neo4j:7474
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      HOME: /tmp
+    ports:
+      - "${APP_PORT:-8081}:8081"
+    volumes:
+      - ./data:/app/data
+      - ./tools:/app/tools:ro
+      - ./planets-credentials.properties:/app/planets-credentials.properties:ro
+
+volumes:
+  neo4j-data:
