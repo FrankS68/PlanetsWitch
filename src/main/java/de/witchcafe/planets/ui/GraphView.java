@@ -1,11 +1,13 @@
 package de.witchcafe.planets.ui;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.neo4j.core.Neo4jClient;
 
 import com.google.gson.Gson;
 import com.vaadin.flow.component.AttachEvent;
@@ -67,17 +69,20 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 	private final DatePicker gamesSince = new DatePicker();
 
 	private final SavedSearchService savedSearchService;
+	private final Neo4jClient neo4jClient;
 	private final String neo4jUri;
 	private final String neo4jUser;
 	private final String neo4jPassword;
 
     public GraphView(
     		SavedSearchService savedSearchService,
+    		Neo4jClient neo4jClient,
     		// the browser connects itself, so in docker it needs the host's address, not the service name
     		@Value("${planetswitch.graph.neo4j-uri:${spring.neo4j.uri}}") String neo4jUri,
     		@Value("${spring.neo4j.authentication.username}") String neo4jUser,
     		@Value("${spring.neo4j.authentication.password:}") String neo4jPassword) {
         this.savedSearchService = savedSearchService;
+        this.neo4jClient = neo4jClient;
         this.neo4jUri = neo4jUri;
         this.neo4jUser = neo4jUser;
         this.neo4jPassword = neo4jPassword;
@@ -211,6 +216,25 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         getFilterDialog().refresh();
         pushFilterEntries();
         getElement().executeJs("window.visualisation.getVisualisation().updateWithCypher($0);", filter.toCypher(condition));
+        notifyHiddenGames(condition);
+    }
+
+    /** tells how many of the loaded games the "Spiele seit" date hides, e.g. after "History laden" */
+    private void notifyHiddenGames(Condition condition) {
+        if (filter.getGamesSince() == null) {
+            return;
+        }
+        long[] counts = neo4jClient.query(filter.countGamesCypher(condition))
+                .fetchAs(long[].class)
+                .mappedBy((types, row) -> new long[] { row.get("total").asLong(), row.get("shown").asLong() })
+                .one().orElse(new long[] { 0, 0 });
+        long hidden = counts[0] - counts[1];
+        if (hidden > 0) {
+            Notification.show(String.format(
+                    "%d Spiele geladen, %d davon wegen „Spiele seit %s“ ausgeblendet. Datum leeren, um alle zu sehen.",
+                    counts[0], hidden, gamesSince.getValue().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))),
+                    8000, Notification.Position.BOTTOM_START);
+        }
     }
 
 
@@ -478,11 +502,13 @@ window.setupContextMenu = function() {
 }
 
 // loads the data into neo4j, then the view adds the node as OR branch to the filter and to the graph
+// loading a history can take some seconds (about 12 s for 200 games), so show the wait cursor
 window.loadAndAdd = function(url, label, property, value) {
+	document.body.style.cursor = 'wait';
 	fetch(url).then(res => res.text()).then(text => {
 		console.log(text);
-		window.graphView.$server.addToFilter(label, property, value);
-	});
+		return window.graphView.$server.addToFilter(label, property, value);
+	}).finally(() => document.body.style.cursor = '');
 }
 
 // the filter entry (label, property, values) that brings this node into the graph, if any

@@ -377,6 +377,18 @@ public class GraphFilter {
 		return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : null;
 	}
 
+	/**
+	 * Counts the games a condition brings into the graph (the matched nodes and their neighbours):
+	 * all of them and those shown with the current "Spiele seit" date. Returns total and shown.
+	 */
+	public String countGamesCypher(Node node) {
+		String shown = gamesSince == null ? "count(g)"
+				: "count(CASE WHEN g.datecreated >= " + gamesSinceLiteral() + " THEN 1 END)";
+		return "MATCH (n)-[r]-(m)\nWHERE " + node.toCypher()
+				+ "\nUNWIND [x IN [n, m] WHERE x:Game] AS g\nWITH DISTINCT g\nRETURN count(g) AS total, "
+				+ shown + " AS shown";
+	}
+
 	public String toCypher(Node node) {
 		String where = gamesSince == null ? node.toCypher()
 				: "(" + node.toCypher() + ")\nAND " + gameCreatedSince("n") + " AND " + gameCreatedSince("m");
