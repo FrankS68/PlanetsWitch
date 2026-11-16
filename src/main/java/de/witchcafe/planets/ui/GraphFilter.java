@@ -1,5 +1,6 @@
 package de.witchcafe.planets.ui;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -239,6 +240,8 @@ public class GraphFilter {
 	}
 
 	private Group root;
+	/** only games created on or after this day are shown; null shows all. Not part of saved searches. */
+	private LocalDate gamesSince;
 
 	public GraphFilter(Node initial) {
 		reset(initial);
@@ -246,6 +249,23 @@ public class GraphFilter {
 
 	public void reset(Node initial) {
 		root = new Group(Junction.OR, initial);
+	}
+
+	/** an empty filter matches nothing; additive loads from the context menu become its OR branches */
+	public void clear() {
+		root = new Group(Junction.OR);
+	}
+
+	public boolean isEmpty() {
+		return root.children.isEmpty();
+	}
+
+	public LocalDate getGamesSince() {
+		return gamesSince;
+	}
+
+	public void setGamesSince(LocalDate gamesSince) {
+		this.gamesSince = gamesSince;
 	}
 
 	public Group getRoot() {
@@ -357,9 +377,21 @@ public class GraphFilter {
 		return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : null;
 	}
 
-	public static String toCypher(Node node) {
+	public String toCypher(Node node) {
+		String where = gamesSince == null ? node.toCypher()
+				: "(" + node.toCypher() + ")\nAND " + gameCreatedSince("n") + " AND " + gameCreatedSince("m");
 		// the undirected pattern finds every relationship twice, the graph needs it once
-		return "MATCH (n)-[r]-(m)\nWHERE " + node.toCypher() + "\nWITH DISTINCT r\nRETURN startNode(r) AS n, r, endNode(r) AS m";
+		return "MATCH (n)-[r]-(m)\nWHERE " + where + "\nWITH DISTINCT r\nRETURN startNode(r) AS n, r, endNode(r) AS m";
+	}
+
+	/** games without datecreated (details never loaded) are left out, their age is unknown */
+	private String gameCreatedSince(String variable) {
+		return String.format("(NOT %1$s:Game OR %1$s.datecreated >= %2$s)", variable, gamesSinceLiteral());
+	}
+
+	/** datecreated is stored as ISO string (e.g. 2026-05-16T10:00:00Z), so a date prefix compares correctly */
+	String gamesSinceLiteral() {
+		return quote(gamesSince.toString());
 	}
 
 	static String quote(String value) {

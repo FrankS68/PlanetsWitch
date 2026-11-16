@@ -22,6 +22,15 @@ class GraphFilterTests {
 	}
 
 	@Test
+	void testGamesSince() {
+		GraphFilter filter = new GraphFilter(new Condition("Player", "accountid", Operator.EQUALS, "42"));
+		filter.setGamesSince(java.time.LocalDate.of(2026, 5, 16));
+		assertEquals("MATCH (n)-[r]-(m)\nWHERE ((n:Player AND n.accountid = '42'))\n"
+				+ "AND (NOT n:Game OR n.datecreated >= '2026-05-16') AND (NOT m:Game OR m.datecreated >= '2026-05-16')\n"
+				+ "WITH DISTINCT r\nRETURN startNode(r) AS n, r, endNode(r) AS m", filter.toCypher());
+	}
+
+	@Test
 	void testAlternativesAndNestedGroup() {
 		GraphFilter filter = new GraphFilter(new Condition("Game", "gameId", Operator.EQUALS, "664877"));
 		Group group = filter.getRoot().add(new Group(Junction.AND));

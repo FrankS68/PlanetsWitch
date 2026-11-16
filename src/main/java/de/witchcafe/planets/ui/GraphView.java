@@ -1,6 +1,8 @@
 package de.witchcafe.planets.ui;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +14,8 @@ import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.dependency.JavaScript;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.icon.Icon;
@@ -35,9 +39,30 @@ import de.witchcafe.planets.ui.GraphFilter.Operator;
 @JavaScript("./dist/neovis.js")
 public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
+	/**
+	 * Start view without a filter: the top 3 officers of each race (latest leaderboard load), their
+	 * players and the games in which at least two of these players met. The whole graph is too big
+	 * for the browser (about 9000 relationships on spiekeroog). %s limits the games by creation date.
+	 */
+	static final String TOP_OFFICERS_CYPHER = """
+			MATCH (x:Officer) WITH max(x.topOfficerLoaded) AS latest
+			MATCH (o:Officer)-[top:officerOf]->(p:Player) WHERE o.topOfficerLoaded = latest AND o.rank <= 3
+			WITH collect(top) AS tops, collect(DISTINCT p) AS players
+			WITH tops, COLLECT {
+			  MATCH (p:Player)-[pi:playedIn]->(g:Game) WHERE p IN players%s
+			  WITH g, collect(DISTINCT p) AS together, collect(pi) AS rels WHERE size(together) >= 2
+			  UNWIND rels AS shared RETURN shared
+			} AS shared
+			UNWIND tops + shared AS r
+			RETURN startNode(r) AS n, r, endNode(r) AS m""";
+
+	/** default of the "Spiele seit" date: games created in the last six months */
+	static final int DEFAULT_MONTHS = 6;
+
 	private final GraphFilter filter = new GraphFilter(Condition.all());
 	private GraphFilterDialog filterDialog;
 	private final ComboBox<SavedSearch> savedSearches = new ComboBox<>();
+	private final DatePicker gamesSince = new DatePicker();
 
 	private final SavedSearchService savedSearchService;
 	private final String neo4jUri;
@@ -67,11 +92,24 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         });
         refreshSavedSearches();
 
+        gamesSince.setLocale(Locale.GERMANY);
+        gamesSince.setPlaceholder("Spiele seit ...");
+        gamesSince.setTooltipText("Nur Spiele, die an oder nach diesem Tag erstellt wurden; leer = alle Spiele");
+        gamesSince.setClearButtonVisible(true);
+        gamesSince.setValue(LocalDate.now().minusMonths(DEFAULT_MONTHS));
+        filter.setGamesSince(gamesSince.getValue());
+        gamesSince.addValueChangeListener(e -> {
+        	if (e.isFromClient()) {
+        		changeGamesSince(e.getValue());
+        	}
+        });
+
         add(new ViewToolbar(
         		"Konstellationen",
         		ViewToolbar.group(
         				new Button("Filter", new Icon(VaadinIcon.FILTER), e -> getFilterDialog().open()),
-        				savedSearches)));
+        				savedSearches,
+        				gamesSince)));
 
         Div viz = new Div();
         viz.setId("viz");
@@ -113,7 +151,29 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
     private void renderFilter() {
         getFilterDialog().useTree();
-        renderCypher(filter.toCypher());
+        renderCypher(currentCypher());
+    }
+
+    /** the filter's query, or the top officers start view while the filter is empty */
+    private String currentCypher() {
+        if (!filter.isEmpty()) {
+            return filter.toCypher();
+        }
+        return TOP_OFFICERS_CYPHER.formatted(filter.getGamesSince() == null ? ""
+                : " AND g.datecreated >= " + filter.gamesSinceLiteral());
+    }
+
+    /** reloads the graph with the new date; a hand edited query is left alone */
+    private void changeGamesSince(LocalDate since) {
+        filter.setGamesSince(since);
+        if (filterDialog != null && filterDialog.isCustom()) {
+            Notification.show("Die handgeschriebene Abfrage kennt keinen Zeitraum, der Graph bleibt unverändert.");
+            return;
+        }
+        if (filterDialog != null) {
+            filterDialog.refresh();
+        }
+        renderCypher(currentCypher());
     }
 
     /** the context menu offers "remove from filter" for nodes matching one of these entries */
@@ -148,20 +208,20 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         Condition condition = filter.addAlternative(new Condition(label, property, Operator.EQUALS, value));
         getFilterDialog().refresh();
         pushFilterEntries();
-        getElement().executeJs("window.visualisation.getVisualisation().updateWithCypher($0);", GraphFilter.toCypher(condition));
+        getElement().executeJs("window.visualisation.getVisualisation().updateWithCypher($0);", filter.toCypher(condition));
     }
 
 
     /**
      * graph?player=<accountid> starts with that player and everything connected to it
-     * (games, officers) instead of the whole graph.
+     * (games, officers) instead of the top officers start view.
      */
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        filter.reset(event.getLocation().getQueryParameters().getSingleParameter("player")
+        event.getLocation().getQueryParameters().getSingleParameter("player")
         		.filter(accountId -> accountId.matches("[0-9]+"))
         		.map(accountId -> new Condition("Player", "accountid", Operator.EQUALS, accountId))
-        		.orElse(Condition.all()));
+        		.ifPresentOrElse(filter::reset, filter::clear);
         if (filterDialog != null) {
         	filterDialog.refresh();
         }
@@ -531,7 +591,7 @@ window.handleMenuAction = function(type) {
 				.replace("__NEO4J_URI__", gson.toJson(neo4jUri))
 				.replace("__NEO4J_USER__", gson.toJson(neo4jUser))
 				.replace("__NEO4J_PASSWORD__", gson.toJson(neo4jPassword))
-				.replace("__INITIAL_CYPHER__", gson.toJson(filter.toCypher()));
+				.replace("__INITIAL_CYPHER__", gson.toJson(currentCypher()));
 	}
 
 	private String createLabelSection() {

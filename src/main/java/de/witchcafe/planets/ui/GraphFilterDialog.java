@@ -162,6 +162,11 @@ public class GraphFilterDialog extends Dialog {
 	}
 
 	/** Makes the tree the source of the query again, e.g. after the filter was changed from the graph. */
+	/** true while a hand edited query is shown instead of the one built from the tree */
+	public boolean isCustom() {
+		return custom;
+	}
+
 	public void useTree() {
 		custom = false;
 		refresh();
