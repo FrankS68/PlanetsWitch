@@ -36,7 +36,9 @@ import de.witchcafe.planets.ui.GraphFilter.Operator;
 @Route("graph")
 @PageTitle("Konstellationen")
 @Menu(order = 0, icon = "vaadin:star", title = "Konstellationen")
-@JavaScript("./dist/neovis.js")
+// a classic script, not bundled: Vite wraps the UMD build as CommonJS module, so the production
+// bundle never sets window.NeoVis ("NeoVis is not defined")
+@JavaScript("context://neovis/neovis.js")
 public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
 	/**
