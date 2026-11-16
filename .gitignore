@@ -12,6 +12,14 @@
 node_modules/
 src/main/frontend/generated/
 vite.generated.ts
+src/main/bundles/
+/.vaadin/
+/tsconfig.json
+/types.d.ts
+/vite.config.ts
+
+# Eclipse
+/.eclipse/
 
 # game archives downloaded via /game/loadall
 /data/
