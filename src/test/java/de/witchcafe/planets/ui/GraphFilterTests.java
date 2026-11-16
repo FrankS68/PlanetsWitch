@@ -31,6 +31,18 @@ class GraphFilterTests {
 	}
 
 	@Test
+	void testCountGames() {
+		GraphFilter filter = new GraphFilter(Condition.all());
+		Condition player = new Condition("Player", "accountid", Operator.EQUALS, "42");
+		assertEquals("MATCH (n)-[r]-(m)\nWHERE (n:Player AND n.accountid = '42')\n"
+				+ "UNWIND [x IN [n, m] WHERE x:Game] AS g\nWITH DISTINCT g\nRETURN count(g) AS total, count(g) AS shown",
+				filter.countGamesCypher(player));
+		filter.setGamesSince(java.time.LocalDate.of(2026, 5, 16));
+		assertTrue(filter.countGamesCypher(player)
+				.endsWith("count(CASE WHEN g.datecreated >= '2026-05-16' THEN 1 END) AS shown"));
+	}
+
+	@Test
 	void testAlternativesAndNestedGroup() {
 		GraphFilter filter = new GraphFilter(new Condition("Game", "gameId", Operator.EQUALS, "664877"));
 		Group group = filter.getRoot().add(new Group(Junction.AND));
