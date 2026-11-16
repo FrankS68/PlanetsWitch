@@ -67,6 +67,8 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 	private GraphFilterDialog filterDialog;
 	private final ComboBox<SavedSearch> savedSearches = new ComboBox<>();
 	private final DatePicker gamesSince = new DatePicker();
+	/** true while the top officers start view is the base of the graph (opened without ?player=) */
+	private boolean showStartView;
 
 	private final SavedSearchService savedSearchService;
 	private final Neo4jClient neo4jClient;
@@ -129,6 +131,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
     
     /** shows a saved search: its tree, or its hand edited query */
     private void loadSearch(SavedSearch search) {
+        showStartView = false;
         filter.fromJson(search.getFilterJson());
         GraphFilterDialog dialog = getFilterDialog();
         dialog.setSearchName(search.getName());
@@ -161,13 +164,23 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         renderCypher(currentCypher());
     }
 
-    /** the filter's query, or the top officers start view while the filter is empty */
+    /**
+     * The filter's query. While the start view is shown, the top officers stay the base of the graph
+     * and nodes loaded from the context menu (the filter's OR branches) are added to them.
+     */
     private String currentCypher() {
-        if (!filter.isEmpty()) {
+        if (!showStartView) {
             return filter.toCypher();
         }
-        return TOP_OFFICERS_CYPHER.formatted(filter.getGamesSince() == null ? ""
+        String topOfficers = TOP_OFFICERS_CYPHER.formatted(filter.getGamesSince() == null ? ""
                 : " AND g.datecreated >= " + filter.gamesSinceLiteral());
+        return filter.isEmpty() ? topOfficers : topOfficers + "\nUNION\n" + filter.toCypher();
+    }
+
+    /** a query from the filter dialog replaces the start view */
+    private void applyFromDialog(String cypher) {
+        showStartView = false;
+        renderCypher(cypher);
     }
 
     /** reloads the graph with the new date; a hand edited query is left alone */
@@ -201,7 +214,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
 
     private GraphFilterDialog getFilterDialog() {
         if (filterDialog == null) {
-            filterDialog = new GraphFilterDialog(filter, this::renderCypher, savedSearchService, this::refreshSavedSearches);
+            filterDialog = new GraphFilterDialog(filter, this::applyFromDialog, savedSearchService, this::refreshSavedSearches);
         }
         return filterDialog;
     }
@@ -248,6 +261,7 @@ public class GraphView extends VerticalLayout implements BeforeEnterObserver {
         		.filter(accountId -> accountId.matches("[0-9]+"))
         		.map(accountId -> new Condition("Player", "accountid", Operator.EQUALS, accountId))
         		.ifPresentOrElse(filter::reset, filter::clear);
+        showStartView = filter.isEmpty();
         if (filterDialog != null) {
         	filterDialog.refresh();
         }
