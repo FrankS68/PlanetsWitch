@@ -4,8 +4,9 @@ Analyse-Tool für das Online-Strategiespiel planets.nu: Spring Boot 4 + Vaadin +
 Lädt Spiele, Spieler, Leaderboard und Turn-Archive über die öffentliche API von planets.nu
 in einen Graphen und zeigt Auswertungen in Vaadin-Views (Topofficer-Chart, Graph, Spiel- und
 Spieleranalysen). Python-Hilfsskripte liegen in `tools/`, ihre Ergebnisse in `data/analysis/`.
-Drei Agentinnen arbeiten mit: **Aletheia** (Topofficer-Bericht, Analysen, `.claude/agents/aletheia.md`),
-**Urania** (Topofficer-Stand, Antworten auf Fragen) und **Artemis** (spielt selbst, Account „lomize").
+Zwei Agentinnen arbeiten mit: **Aletheia** (Topofficer-Bericht, Topofficer-Stand, Analysen, Antworten auf
+Fragen, `.claude/agents/aletheia.md`; hat am 19.11.2026 die Aufgaben von Urania übernommen) und
+**Artemis** (spielt selbst, Account „lomize").
 Sie laufen per Cron auf dem Raspberry Pi Spiekeroog, siehe `docs/operations.md`.
 
 ## Start here
