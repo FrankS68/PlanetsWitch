@@ -39,11 +39,12 @@ Crontab von `claudine` (Europe/Berlin):
 |---|---|---|---|
 | 07:00 | Kalliope | `~/agenten/kalliope` | Quellen für knownet (anderes Projekt) |
 | 08:30, 11:30, 18:30, 19:30 | Artemis | `~/agenten/artemis` | Fragerunde (08:30/18:30), Spielrunde (11:30/19:30); Gate begrenzt Abendläufe |
-| 09:00, 19:00 | Urania | `~/agenten/urania` | Topofficer-Stand, Antworten auf Fragen |
-| 09:30 | Aletheia | `~/planetswitch` | Topofficer-Bericht, Analysen, Antworten |
+| 09:30 | Aletheia | `~/planetswitch` | Hauptlauf: Topofficer-Bericht, Topofficer-Stand, Spiele der Spitzenreiter, Analysen, Antworten |
+| 19:00 | Aletheia | `~/planetswitch` | Abendlauf (`~/agenten/aletheia-abend-prompt.md`): Fragen von Artemis, kleine Aufgaben, Kommentare |
 
-Ablauf und Rollen: ADR 0002 (Cron auf Spiekeroog) und ADR 0004 (Fragen sind Informationsanfragen).
-unsicher: ob Uranias alte Cloud-Routine nur deaktiviert oder gelöscht ist.
+Ablauf und Rollen: ADR 0002 (Cron auf Spiekeroog), ADR 0004 (Fragen sind Informationsanfragen) und
+ADR 0005 (Aletheia übernimmt Urania). Urania läuft seit 2026-11-19 nicht mehr; ihr Prompt und
+`~/agenten/urania` liegen noch auf dem Pi.
 
 ## Logbücher
 
